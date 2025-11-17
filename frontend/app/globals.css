@@ -19,6 +19,11 @@
   box-sizing: border-box;
 }
 
+html {
+
+  overscroll-behavior-y: none; /* Disables the "bounce" effect */
+}
+
 html,
 body {
   height: 100%;
@@ -29,13 +34,15 @@ body {
 body {
   font-family: 'Inter', sans-serif;
   color: var(--c-text-light);
-  background-color: #000;
   background-image: radial-gradient(ellipse at top center, 
     var(--c-dark-purple) 0%, 
     #1a0e1c 60%, 
     #000000 100%);
   background-repeat: no-repeat;
   background-attachment: fixed;
+  overflow-x: hidden;
+  background-size: 200% 200%;
+  animation: moveGradient 15s ease infinite;
 }
 
 main {
@@ -46,6 +53,7 @@ main {
   min-height: 100vh;
   padding: 1rem;
   width: 100%;
+  transition: opacity 0.5s ease-out 0.4s, transform 0.5s ease-out 0.4s;
 }
 
 a {
@@ -74,6 +82,42 @@ p {
   justify-content: center;
   padding-top: 2.5rem;
   padding-bottom: 1rem;
+  
+  /* --- ADD THESE 5 LINES --- */
+  /* This tells the header how to animate */
+  transition: all 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+  position: relative; /* Must be relative for transform to work */
+  top: 0;
+  transform: none;
+}
+
+body.app-loading {
+  height: 100vh;
+  overflow: hidden; /* Hide scrollbars during animation */
+}
+
+/* Hides the main page content */
+body.app-loading main {
+  opacity: 0;
+  transform: translateY(30px); /* Will slide up from "under" */
+  display: block; /* Override default 'display: none' */
+}
+
+/* Hides any header buttons (like Sign Out) */
+body.app-loading .header-actions {
+  display: none;
+}
+
+/* This is the starting position for the header (centered) */
+body.app-loading .global-header {
+  position: fixed;
+  top: 50%; /* Center vertically */
+  left: 50%; /* Center horizontally */
+  transform: translate(-50%, -50%); /* Adjust for element size */
+  
+  /* Remove padding for the centered state */
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 .logo {
@@ -135,7 +179,7 @@ p {
 }
 
 .btn-sign-in-header {
-  background: var(--c-card-bg-light);
+  background: var(--c-card-bg);
   color: var(--c-text-light);
   border: 1px solid var(--c-card-bg-light);
   padding: 0.5rem 1rem;
@@ -145,7 +189,7 @@ p {
   font-size: 0.9rem;
 }
 .btn-sign-in-header:hover {
-  background: var(--c-card-bg);
+  background: var(--c-card-bg-light);
 }
 
 .auth-container,
@@ -168,6 +212,19 @@ p {
   gap: 1rem;
   margin-top: 1.5rem;
   text-align: left;
+}
+
+.auth-toggle-link {
+  color: var(--c-text-faded);
+  font-size: 0.9rem;
+  margin-top: 1.5rem;
+  margin-bottom: 0;
+}
+.auth-toggle-link span {
+  color: var(--c-light-purple);
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: underline;
 }
 
 .auth-form input,
@@ -210,6 +267,81 @@ p {
 .btn-secondary:hover {
   background: #5a5a5a;
 }
+
+.btn-google {
+  padding: 1rem;
+  border: 1px solid var(--c-card-bg-light);
+  cursor: pointer;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 700;
+  background: #fff;
+  color: #333;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.btn-google:before {
+  content: '';
+  display: block;
+  width: 20px;
+  height: 20px;
+  background-image: url('https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+.btn-google:hover {
+  background: #f0f0f0;
+}
+
+/* --- ADD THESE NEW ANIMATION RULES --- */
+
+/* The keyframes for the spinning logo */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* This is the full-screen overlay for the loading state */
+.app-loading-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: var(--c-dark-purple); /* Matches the app background */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  transition: opacity 0.5s ease-out; /* Fades out */
+}
+
+/* This applies the spin animation to the logo *inside* the overlay */
+.app-loading-overlay .loading-logo {
+  animation: spin 1s linear;
+}
+
+/* This is the wrapper for your actual app content */
+.app-content-wrapper {
+  transition: opacity 0.5s ease-in 0.3s; /* Fades in, with a delay */
+}
+
+/* Utility classes to control the fading */
+.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+/* --- END OF NEW RULES --- */
 
 .login-modal-overlay {
   position: fixed;
@@ -288,6 +420,38 @@ p {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+}
+
+.question-nav-header {
+  height: 30px; /* Gives space for the button */
+  position: relative;
+  width: 100%;
+}
+
+.btn-back-question {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: none;
+  border: none;
+  color: var(--c-text-faded);
+  font-size: 2.5rem;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  transition: color 0.2s ease, opacity 0.2s ease;
+  opacity: 0.7; /* Start slightly faded */;
+}
+
+.btn-back-question img {
+  width: 20px; /* Set a good size for the arrow */
+  height: 20px;
+  display: block;
+}
+
+.btn-back-question:hover {
+  opacity: 1; /* Fade in fully */
+  transform: scale(1.1); /* Slight pulse */
 }
 
 .question-text {
@@ -378,10 +542,7 @@ p {
 
 
 .page-nav-header {
-  position: -webkit-sticky; /* ADDED for cross-browser */
-  position: sticky;
-  top: 120px;
-  width: fit-content; /* ADDED: So it doesn't stretch */
+  width: fit-content;
 }
 
 .page-nav-header a {
@@ -396,6 +557,37 @@ p {
 .page-nav-header a:hover {
   background: var(--c-card-bg-light);
   text-decoration: none;
+}
+
+.verification-notice {
+  width: 100%;
+  padding: 1rem;
+  background: rgba(255, 187, 0, 0.1);
+  border: 1px solid #ffbb00;
+  border-radius: 10px;
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+.verification-notice p {
+  color: #ffbb00;
+  margin: 0 0 0.75rem 0;
+  font-weight: 500;
+}
+.verification-notice button {
+  background: var(--c-card-bg-light);
+  color: var(--c-text-light);
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.verification-notice button:hover {
+  background: #5a5a5a;
+}
+.verification-notice button:disabled {
+  background: var(--c-yes);
+  color: var(--c-text-dark);
+  cursor: not-allowed;
 }
 
 /* --- PROFILE PAGE --- */
@@ -429,9 +621,7 @@ p {
   cursor: pointer;
   margin-bottom: 1.5rem;
 }
-.pfp-uploader:hover .pfp-edit-text {
-  opacity: 1;
-}
+
 
 .pfp-preview {
   width: 150px;
@@ -442,6 +632,10 @@ p {
   background-color: var(--c-card-bg-light);
 }
 
+.pfp-uploader:hover .pfp-edit-text {
+  opacity: 1;
+}
+
 .pfp-edit-text {
   position: absolute;
   bottom: 0;
@@ -450,12 +644,12 @@ p {
   background-color: rgba(0, 0, 0, 0.6);
   color: white;
   text-align: center;
-  padding: 0.5rem 0;
-  font-size: 0.9rem;
-  opacity: 0;
+  padding: 0.2rem 0;
+  font-size: 0.8rem;
+  opacity: 0.7;
   transition: opacity 0.2s ease;
-  border-bottom-left-radius: 75px;
-  border-bottom-right-radius: 75px;
+  border-bottom-left-radius: 100px;
+  border-bottom-right-radius: 100px;
 }
 /* Hide the default file input */
 #file-input {
@@ -567,6 +761,16 @@ p {
   text-align: center;
   margin-bottom: 2rem;
 }
+
+.group-empty-message {
+  color: var(--c-text-faded);
+  font-size: 1.1rem;
+  font-style: italic;
+  text-align: center;
+  max-width: 400px;
+  margin: 2rem 0;
+}
+
 .group-header h1 code {
   font-size: 1.5rem;
   background: rgba(0, 0, 0, 0.2);
@@ -619,7 +823,110 @@ p {
   padding: 0; 
   border-radius: 20px;
   border: none; 
-  width: 220px; 
+  width: 220px;
+  transition: transform 0.2s ease-in-out;
+  cursor: pointer;
+}
+
+.member-circle-card:hover {
+  transform: scale(1.05);
+}
+
+.member-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px); 
+}
+
+.member-modal-content {
+  position: relative;
+  width: 100%;
+  max-width: 550px;
+  background: transparent; 
+  border: none; 
+  padding: 2.5rem 3rem;
+  border-radius: 20px;
+  box-shadow: none; 
+  
+  /* --- Flex layout for modal --- */
+  display: flex;
+  flex-direction: row; /* <-- CHANGED BACK */
+  align-items: center;
+  gap: 2rem;
+}
+
+.modal-exit-text {
+  position: absolute;
+  bottom: 3rem; /* Position it near the bottom of the screen */
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--c-text-faded); /* Small gray text */
+  font-size: 0.7rem;
+  font-weight: 500;
+  pointer-events: none; /* Prevents text from blocking the overlay click */
+}
+
+.member-modal-image {
+  flex-shrink: 0;
+}
+.member-modal-image img {
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid var(--c-card-bg-light);
+}
+
+.member-modal-info {
+  flex-grow: 1;
+  text-align: center;
+}
+.member-modal-info h2 {
+  font-size: 2rem;
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: #fff;
+}
+
+.you-tag-modal {
+  font-size: 0.9rem;
+  font-weight: 700;
+  background: var(--c-light-purple);
+  color: var(--c-text-dark);
+  padding: 0.2rem 0.7rem;
+  border-radius: 10px;
+  display: inline-block;
+  margin-bottom: 1.5rem;
+}
+
+.social-links-modal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.social-links-modal a {
+  font-size: 1rem;
+  font-weight: 500;
+  background: var(--c-card-bg-light);
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  border: 1px solid var(--c-card-bg-light);
+  color: var(--c-text-light);
+}
+.social-links-modal a:hover {
+  background: #5a5a5a;
+  text-decoration: none;
 }
 
 /* NEW: Wrapper for avatar and 'you' tag */
@@ -704,7 +1011,21 @@ p {
   padding: 1rem;
   border-radius: 10px;
   background: var(--c-card-bg-light);
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
 }
+
+.answer-item:hover {
+  transform: scale(1.02);
+}
+
+.answer-item.yes:hover {
+  box-shadow: 0 0 15px 0px var(--c-yes);
+}
+
+.answer-item.no:hover {
+  box-shadow: 0 0 15px 0px var(--c-no);
+}
+
 .answer-item .question-text {
   margin: 0;
   padding-right: 1rem;
@@ -796,4 +1117,20 @@ p {
 /* Re-using the .btn-secondary style for "Cancel" */
 .modal-actions .btn-secondary {
   padding: 0.85rem 1rem;
+}
+
+@keyframes moveGradient {
+  0% {
+    background-position: 0% 0%;
+  }
+  50% {
+    background-position: 100% 100%;
+  }
+  100% {
+    background-position: 0% 0%;
+  }
+}
+
+body.no-scroll {
+  overflow: hidden;
 }

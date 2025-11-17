@@ -35,15 +35,30 @@ def generate_five_questions():
     prompt = f"""
     Today is {datetime.now().strftime('%A, %B %d, %Y')} in Toronto, Canada.
     
-    Find 5 completely distinct, newsworthy, and recent topics.
-    Topics should be relevant to today's time, drawing from areas like 
-    technology, global events, finance, culture, or sports.
+    Find 5 completely distinct topics from areas like technology, global events, 
+    finance, culture, or sports.
 
-    For each of the 5 topics you find, create one short, simple, polarizing 'Yes or No' 
-    question for a networking app. The goal is to spark discussion.
+    For each topic, create one **extremely simple, short, and polarizing 'Yes or No' question** for a networking app.
+
+    **Strict Rules:**
+    1.  **Length:** Questions must be **10 words or less**.
+    2.  **Simplicity:** Use simple, casual language. Avoid technical jargon or niche subjects.
+    3.  **Goal:** The question must be a simple "Yes/No" binary to spark discussion.
+    
+    **Examples of GOOD, simple questions:**
+    - "Is AI moving too fast?"
+    - "Are electric cars overrated?"
+    - "Should all jobs offer a 4-day work week?"
+    - "Is space exploration a waste of money?"
+    - "Are athletes paid too much?"
+
+    **Examples of BAD, wordy questions:**
+    - "Do you believe the recent advancements in quantum computing will disrupt cybersecurity protocols?"
+    - "Should the federal government increase subsidies for renewable energy manufacturing?"
 
     Return your answer as a single JSON object with a key "questions"
     which holds a list of the 5 question strings.
+    
     """
     
     print(f"Generating 5 questions with Gemini (self-sourced topics)...")

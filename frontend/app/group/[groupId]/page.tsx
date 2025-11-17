@@ -21,9 +21,11 @@ type UserProfile = {
   socials: {
     twitter?: string;
     linkedin?: string;
-    website?: string;
+    instagram?: string;
   };
 };
+
+const DEFAULT_AVATAR_URL = 'https://firebasestorage.googleapis.com/v0/b/brillianse-801f7.firebasestorage.app/o/logos%2FBrillianse%20(5)%20copy.png?alt=media&token=ecffd21e-dff9-4151-b57f-5515be4c87e7';
 
 export default function GroupPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -31,6 +33,7 @@ export default function GroupPage() {
   const [error, setError] = useState<string | null>(null);
   const [members, setMembers] = useState<UserProfile[]>([]);
   const [showSignOutModal, setShowSignOutModal] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<UserProfile | null>(null);
   
   const router = useRouter();
   const params = useParams();
@@ -79,7 +82,13 @@ export default function GroupPage() {
               socials: data.socials || {},
             };
           });
-        setMembers(memberProfiles);
+          const sortedMembers = memberProfiles.sort((a, b) => {
+            if (a.id === user.uid) return -1; // 'a' (current user) comes first
+            if (b.id === user.uid) return 1;  // 'b' (current user) comes first
+            return 0; // Otherwise, keep original order
+          });
+  
+          setMembers(sortedMembers);
       } catch (err: any) {
         console.error(err);
         setError(err.message || 'Failed to load group members.');
@@ -132,15 +141,23 @@ export default function GroupPage() {
         </div>
       </div>
 
+      {members.length === 1 && (
+        <p className="group-empty-message">
+          You're the first one here. Others are joining soon, check back later!
+        </p>
+      )}
+
       <div className="member-list">
         {members.map(member => (
-          <div key={member.id} className="member-circle-card">
+          <div key={member.id}
+          className="member-circle-card"
+            onClick={() => setSelectedMember(member)}>
             <div className="member-avatar-wrapper">
               <img 
-                src={member.profilePictureUrl || 'https://placehold.co/120x120/f0f0f0/333?text=?'} 
+                src={member.profilePictureUrl || DEFAULT_AVATAR_URL} 
                 alt="Profile"
                 className="member-avatar" // This class will be bigger
-                onError={(e) => (e.currentTarget.src = 'https://placehold.co/120x120/f0f0f0/333?text=?')}
+                onError={(e) => (e.currentTarget.src = DEFAULT_AVATAR_URL)}
               />
               {member.id === user?.uid && (
                 <span className="you-tag-circle">You</span>
@@ -159,15 +176,15 @@ export default function GroupPage() {
                 {member.socials.linkedin && (
                   <a href={member.socials.linkedin.startsWith('http') ? member.socials.linkedin : `https://${member.socials.linkedin}`} target="_blank" rel="noopener noreferrer">LinkedIn</a>
                 )}
-                {member.socials.website && (
-                  <a href={member.socials.website.startsWith('http') ? member.socials.website : `https://${member.socials.website}`} target="_blank" rel="noopener noreferrer">Website</a>
+                {member.socials.instagram && (
+                 <a href={`https://instagram.com/${member.socials.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer">Instagram</a>
                 )}
                 {member.id !== user?.uid && (
                   <a href={`mailto:${member.email}`}>Email</a>
                 )}
               </div>
               
-              {!member.socials.twitter && !member.socials.linkedin && !member.socials.website && member.id !== user?.uid && (
+              {!member.socials.twitter && !member.socials.linkedin && !member.socials.instagram && member.id !== user?.uid && (
                 <p className="no-socials">This user hasn't added their socials yet.</p>
               )}
             </div>
@@ -188,6 +205,48 @@ export default function GroupPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {selectedMember && (
+        <div className="member-modal-overlay" onClick={() => setSelectedMember(null)}>
+          <div className="member-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="member-modal-image">
+              <img 
+                src={selectedMember.profilePictureUrl || DEFAULT_AVATAR_URL}
+                alt="Profile"
+                onError={(e) => (e.currentTarget.src = DEFAULT_AVATAR_URL)}
+              />
+            </div>
+            
+            <div className="member-modal-info">
+              <h2>{selectedMember.username}</h2>
+              
+              {selectedMember.id === user?.uid && (
+                <span className="you-tag-modal">You</span>
+              )}
+              
+              <div className="social-links-modal">
+                {selectedMember.socials.twitter && (
+                  <a href={`https://twitter.com/${selectedMember.socials.twitter.replace('@', '')}`} target="_blank" rel="noopener noreferrer">Twitter</a>
+                )}
+                {selectedMember.socials.linkedin && (
+                  <a href={selectedMember.socials.linkedin.startsWith('http') ? selectedMember.socials.linkedin : `https://${selectedMember.socials.linkedin}`} target="_blank" rel="noopener noreferrer">LinkedIn</a>
+                )}
+                {selectedMember.socials.instagram && (
+                 <a href={`https://instagram.com/${selectedMember.socials.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer">Instagram</a>
+                )}
+                {selectedMember.id !== user?.uid && (
+                  <a href={`mailto:${selectedMember.email}`}>Email</a>
+                )}
+              </div>
+              
+              {!selectedMember.socials.twitter && !selectedMember.socials.linkedin && !selectedMember.socials.instagram && selectedMember.id !== user?.uid && (
+                <p className="no-socials">This user hasn't added their socials yet.</p>
+              )}
+            </div>
+            
+          </div>
+          <p className="modal-exit-text">Press anywhere to exit enlarged view</p>
         </div>
       )}
     </main>

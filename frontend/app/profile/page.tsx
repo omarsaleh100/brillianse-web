@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { db, auth, storage } from '../../lib/firebase'; // <-- Import storage
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { onAuthStateChanged, User, signOut } from 'firebase/auth';
+import { doc, getDoc, setDoc, collection, query, where, getDocs} from 'firebase/firestore';
+import { onAuthStateChanged, User, signOut, sendEmailVerification } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
@@ -12,6 +12,8 @@ import {
   uploadBytesResumable, 
   getDownloadURL 
 } from 'firebase/storage';
+
+const DEFAULT_AVATAR_URL = 'https://firebasestorage.googleapis.com/v0/b/brillianse-801f7.firebasestorage.app/o/logos%2FBrillianse%20(5)%20copy.png?alt=media&token=ecffd21e-dff9-4151-b57f-5515be4c87e7';
 
 export default function Profile() {
   const [user, setUser] = useState<User | null>(null);
@@ -21,11 +23,14 @@ export default function Profile() {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  const [isEmailVerified, setIsEmailVerified] = useState(true);
+  const [verificationSent, setVerificationSent] = useState(false);
+
   const [form, setForm] = useState({
     username: '',
     twitter: '',
     linkedin: '',
-    website: '',
+    instagram: '',
   });
   
   const [dailyGroupId, setDailyGroupId] = useState<string | null>(null);
@@ -34,6 +39,7 @@ export default function Profile() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [isProfileComplete, setIsProfileComplete] = useState(false);
   
   const router = useRouter();
 
@@ -41,12 +47,17 @@ export default function Profile() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
+        await currentUser.reload();
         setUser(currentUser);
+        setIsEmailVerified(currentUser.emailVerified);
+
         const userRef = doc(db, 'users', currentUser.uid);
         const docSnap = await getDoc(userRef);
         
         if (docSnap.exists()) {
           const data = docSnap.data();
+          setIsProfileComplete(data.isProfileComplete || false);
+
           let suggestedUsername = data.username || '';
           if (!data.isProfileComplete) {
             const name = currentUser.email?.split('@')[0].replace(/[^a-zA-Z0-9]/g, '') || 'user';
@@ -56,7 +67,7 @@ export default function Profile() {
             username: data.username || suggestedUsername,
             twitter: data.socials?.twitter || '',
             linkedin: data.socials?.linkedin || '',
-            website: data.socials?.website || '',
+            instagram: data.socials?.instagram || '',
           });
           setProfilePicUrl(data.profilePictureUrl || null);
           if (data.dailyGroup?.groupId) {
@@ -70,6 +81,26 @@ export default function Profile() {
     });
     return () => unsubscribe();
   }, [router]);
+
+  useEffect(() => {
+    if (!user || isEmailVerified) {
+      return; // Don't run if no user or if already verified
+    }
+
+    // Set up an interval to check every 3 seconds
+    const interval = setInterval(async () => {
+      await user.reload(); // Get fresh data
+      
+      if (user.emailVerified) {
+        setIsEmailVerified(true);
+        clearInterval(interval); // Stop polling
+      }
+    }, 3000); // Check every 3 seconds
+
+    // Clean up the interval when the component unmounts or state changes
+    return () => clearInterval(interval);
+
+  }, [user, isEmailVerified]);
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
@@ -93,17 +124,35 @@ export default function Profile() {
     setSuccessMessage(null);
     setValidationError(null);
 
-    const { username, twitter, linkedin, website } = form;
+    const { username, twitter, linkedin, instagram } = form;
     if (!username) {
       setValidationError('Username is required.');
       return;
     }
-    if (!twitter && !linkedin && !website) {
+    if (!twitter && !linkedin && !instagram) {
       setValidationError('Please add at least one social media handle.');
       return;
     }
 
     try {
+      // --- START OF UNIQUENESS CHECK ---
+      const userRef = doc(db, 'users', user.uid);
+      const userSnap = await getDoc(userRef);
+      const oldUsername = userSnap.exists() ? userSnap.data().username : null;
+
+      // Only check for uniqueness if the username has actually changed
+      if (oldUsername !== username) {
+        const q = query(collection(db, 'users'), where('username', '==', username));
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+          // A document already exists with this username
+          setValidationError('Username is already taken. Please try again.');
+          return; // Stop the save
+        }
+      }
+      // --- END OF UNIQUENESS CHECK ---
+
       let finalProfilePicUrl = profilePicUrl; 
 
       if (imageFile) {
@@ -133,8 +182,6 @@ export default function Profile() {
           );
         });
       }
-
-      const userRef = doc(db, 'users', user.uid);
       
       await setDoc(userRef, {
         username: username,
@@ -142,7 +189,7 @@ export default function Profile() {
         socials: {
           twitter: twitter,
           linkedin: linkedin,
-          website: website,
+          instagram: instagram,
         },
         profilePictureUrl: finalProfilePicUrl,
         isProfileComplete: true
@@ -165,6 +212,18 @@ export default function Profile() {
       }
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (!user) return;
+    try {
+      await sendEmailVerification(user);
+      setVerificationSent(true);
+      // Hide the "sent" message after a few seconds
+      setTimeout(() => setVerificationSent(false), 3000);
+    } catch (err) {
+      console.error("Failed to resend verification:", err);
     }
   };
 
@@ -192,10 +251,10 @@ export default function Profile() {
 
         {/* --- MODIFIED: Wrapper for the button --- */}
         <div className="profile-nav-wrapper">
-          {dailyGroupId && (
+          {dailyGroupId && isProfileComplete && (
             <div className="page-nav-header">
               <Link href={`/group/${dailyGroupId}`}>
-                &larr; Back to Group
+                &larr;
               </Link>
             </div>
           )}
@@ -210,14 +269,22 @@ export default function Profile() {
           {error && <div className="error-container">{error}</div>}
           {validationError && <div className="validation-error">{validationError}</div>}
 
+          {!isEmailVerified && (
+            <div className="verification-notice">
+              <p>Please check your email to verify your account.</p>
+              <button onClick={handleResendVerification} disabled={verificationSent}>
+                {verificationSent ? 'Sent!' : 'Resend Email'}
+              </button>
+            </div>
+          )}
+
           <div className="pfp-uploader">
             <label htmlFor="file-input">
               <img 
-                src={profilePicUrl || '/default-avatar.png'} 
+                src={profilePicUrl || DEFAULT_AVATAR_URL} 
                 alt="Profile" 
                 className="pfp-preview"
-                onError={(e) => (e.currentTarget.src = 'https://placehold.co/150x150/f0f0f0/333?text=?')}
-              />
+                onError={(e) => (e.currentTarget.src = DEFAULT_AVATAR_URL)}/>
               <span className="pfp-edit-text">Click to change</span>
             </label>
             <input 
@@ -247,8 +314,8 @@ export default function Profile() {
             <input id="linkedin" type="text" value={form.linkedin} onChange={handleChange} />
           </div>
           <div className="input-group">
-            <label htmlFor="website">Personal Website</label>
-            <input id="website" type="text" value={form.website} onChange={handleChange} />
+            <label htmlFor="instagram">Instagram Handle</label>
+            <input id="instagram" type="text" value={form.instagram} onChange={handleChange} placeholder="@username" />
           </div>
 
           <button type="submit" className="btn-submit" disabled={isUploading}>
@@ -258,10 +325,10 @@ export default function Profile() {
         <div className="profile-nav-wrapper">
           {/* This spacer is intentionally left empty */}
           {/* It will take up the same space as the button wrapper */}
-          {dailyGroupId && (
+          {dailyGroupId && isProfileComplete && (
             <div className="page-nav-header" style={{ visibility: 'hidden' }}>
               <Link href={`/group/${dailyGroupId}`}>
-                &larr; Back to Group
+                &larr;
               </Link>
             </div>
           )}

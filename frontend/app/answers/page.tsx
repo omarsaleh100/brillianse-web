@@ -102,7 +102,7 @@ export default function AnswersPage() {
         {groupId && (
           <div className="page-nav-header">
             <Link href={`/group/${groupId}`}>
-              &larr; Back to group
+              &larr; 
             </Link>
           </div>
         )}
@@ -113,7 +113,11 @@ export default function AnswersPage() {
           
           <div className="answers-list">
             {questions.map((question, index) => (
-              <div key={index} className="answer-item">
+              <div 
+                key={index} 
+                // --- MODIFICATION: Added dynamic classes based on the answer ---
+                className={`answer-item ${answers[index] === 'yes' ? 'answered-yes' : 'answered-no'}`}
+              >
                 <p className="question-text">{index + 1}. {question}</p>
                 <span className={`answer-tag ${answers[index] === 'yes' ? 'yes' : 'no'}`}>
                   {answers[index] || 'No Answer'}
@@ -125,7 +129,7 @@ export default function AnswersPage() {
         {groupId && (
           <div className="page-nav-header" style={{ visibility: 'hidden' }}>
           <Link href={`/group/${groupId}`}>
-            &larr; Back to group
+            &larr;
           </Link>
         </div>
         )}
