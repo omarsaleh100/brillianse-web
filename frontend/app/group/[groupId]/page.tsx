@@ -177,7 +177,7 @@ export default function GroupPage() {
                   <a href={member.socials.linkedin.startsWith('http') ? member.socials.linkedin : `https://${member.socials.linkedin}`} target="_blank" rel="noopener noreferrer">LinkedIn</a>
                 )}
                 {member.socials.instagram && (
-                 <a href={`https://instagram.com/${member.socials.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer">Instagram</a>
+                  <a href={member.socials.instagram.startsWith('http') ? member.socials.instagram : `https://${member.socials.instagram}`} target="_blank" rel="noopener noreferrer">Instagram</a>
                 )}
                 {member.id !== user?.uid && (
                   <a href={`mailto:${member.email}`}>Email</a>
