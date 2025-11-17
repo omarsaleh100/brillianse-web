@@ -98,31 +98,40 @@ export default function AnswersPage() {
       <Head>
         <title>My Daily Answers</title>
       </Head>
+      <div className="profile-content-wrapper">
+        {groupId && (
+          <div className="page-nav-header">
+            <Link href={`/group/${groupId}`}>
+              &larr; Back to group
+            </Link>
+          </div>
+        )}
 
-      {/* --- Back to Group Button --- */}
-      {groupId && (
-        <div className="page-nav-header">
+        <div className="profile-form">
+          <h1>Your Answers</h1>
+          <p>These are the answers you submitted today.</p>
+          
+          <div className="answers-list">
+            {questions.map((question, index) => (
+              <div key={index} className="answer-item">
+                <p className="question-text">{index + 1}. {question}</p>
+                <span className={`answer-tag ${answers[index] === 'yes' ? 'yes' : 'no'}`}>
+                  {answers[index] || 'No Answer'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+        {groupId && (
+          <div className="page-nav-header" style={{ visibility: 'hidden' }}>
           <Link href={`/group/${groupId}`}>
-            &larr; Back to Your Group
+            &larr; Back to group
           </Link>
         </div>
-      )}
-
-      <div className="answers-container">
-        <h1>Your Answers</h1>
-        <p>These are the answers you submitted today.</p>
-        
-        <div className="answers-list">
-          {questions.map((question, index) => (
-            <div key={index} className="answer-item">
-              <p className="question-text">{index + 1}. {question}</p>
-              <span className={`answer-tag ${answers[index] === 'yes' ? 'yes' : 'no'}`}>
-                {answers[index] || 'No Answer'}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
+        )}
+      </div> 
+      {/* --- END: Added wrapper div --- */}
+      
     </main>
   );
 }

@@ -30,6 +30,7 @@ export default function GroupPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [members, setMembers] = useState<UserProfile[]>([]);
+  const [showSignOutModal, setShowSignOutModal] = useState(false);
   
   const router = useRouter();
   const params = useParams();
@@ -90,8 +91,14 @@ export default function GroupPage() {
   }, [groupId, user]);
 
   const handleSignOut = async () => {
+    setShowSignOutModal(true);
+  };
+
+  const confirmSignOut = async () => {
     try {
       await signOut(auth);
+      setShowSignOutModal(false); // Close modal on success
+      // Router will redirect via the onAuthStateChanged listener
     } catch (err) {
       console.error('Failed to sign out:', err);
     }
@@ -110,40 +117,42 @@ export default function GroupPage() {
         <title>Your Daily Group</title>
       </Head>
 
+      <div className="header-actions">
+        <button onClick={handleSignOut} className="btn-sign-in-header">
+          Sign Out
+        </button>
+      </div>
+
       <div className="group-header">
         <h1>Your Group: <code>{groupId}</code></h1>
         <p>Here are the {members.length} members who answered the same as you today.</p>
         <div className="header-links">
           <Link href="/profile">Edit Your Profile</Link>
           <Link href="/answers">View My Answers</Link>
-          <button onClick={handleSignOut} className="btn-sign-out">
-            Sign Out
-          </button>
         </div>
       </div>
 
       <div className="member-list">
         {members.map(member => (
-          <div key={member.id} className="member-card">
-            {/* --- NEW: Profile Picture --- */}
-            <img 
-              src={member.profilePictureUrl || 'https://placehold.co/100x100/f0f0f0/333?text=?'} 
-              alt="Profile"
-              className="member-avatar"
-              onError={(e) => (e.currentTarget.src = 'https://placehold.co/100x100/f0f0f0/333?text=?')}
-            />
-            {/* ---------------------------- */}
+          <div key={member.id} className="member-circle-card">
+            <div className="member-avatar-wrapper">
+              <img 
+                src={member.profilePictureUrl || 'https://placehold.co/120x120/f0f0f0/333?text=?'} 
+                alt="Profile"
+                className="member-avatar" // This class will be bigger
+                onError={(e) => (e.currentTarget.src = 'https://placehold.co/120x120/f0f0f0/333?text=?')}
+              />
+              {member.id === user?.uid && (
+                <span className="you-tag-circle">You</span>
+              )}
+            </div>
             
             <div className="member-info">
               <h3>
                 {member.username}
-                {member.id === user?.uid && (
-                  <span className="you-tag">(This is you)</span>
-                )}
               </h3>
               
               <div className="social-links">
-                {/* ... (social links unchanged) ... */}
                 {member.socials.twitter && (
                   <a href={`https://twitter.com/${member.socials.twitter.replace('@', '')}`} target="_blank" rel="noopener noreferrer">Twitter</a>
                 )}
@@ -165,6 +174,22 @@ export default function GroupPage() {
           </div>
         ))}
       </div>
+      {showSignOutModal && (
+          <div className="sign-out-modal-overlay">
+          <div className="sign-out-modal-content">
+            <h2>Are you sure?</h2>
+            <p>This will sign you out of your account and return you to the daily questions.</p>
+            <div className="modal-actions">
+              <button onClick={confirmSignOut} className="btn-danger">
+                Sign Out
+              </button>
+              <button onClick={() => setShowSignOutModal(false)} className="btn-secondary">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

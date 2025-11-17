@@ -190,14 +190,16 @@ export default function Profile() {
       {/* --- NEW: Wrapper for side-by-side layout --- */}
       <div className="profile-content-wrapper">
 
-        {/* --- Back to Group Button --- */}
-        {dailyGroupId && (
-          <div className="page-nav-header">
-            <Link href={`/group/${dailyGroupId}`}>
-              &larr; Back to Group
-            </Link>
-          </div>
-        )}
+        {/* --- MODIFIED: Wrapper for the button --- */}
+        <div className="profile-nav-wrapper">
+          {dailyGroupId && (
+            <div className="page-nav-header">
+              <Link href={`/group/${dailyGroupId}`}>
+                &larr; Back to Group
+              </Link>
+            </div>
+          )}
+        </div>
         {/* ---------------------------- */}
 
         <form onSubmit={handleSave} className="profile-form">
@@ -253,6 +255,17 @@ export default function Profile() {
             {isUploading ? `Uploading... ${uploadProgress.toFixed(0)}%` : 'Save Profile'}
           </button>
         </form>
+        <div className="profile-nav-wrapper">
+          {/* This spacer is intentionally left empty */}
+          {/* It will take up the same space as the button wrapper */}
+          {dailyGroupId && (
+            <div className="page-nav-header" style={{ visibility: 'hidden' }}>
+              <Link href={`/group/${dailyGroupId}`}>
+                &larr; Back to Group
+              </Link>
+            </div>
+          )}
+        </div>
       </div>
       {/* --- End of new wrapper --- */}
 

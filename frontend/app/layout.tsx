@@ -1,10 +1,20 @@
 import './globals.css';
 import { ReactNode } from 'react';
-import Image from 'next/image'; // <-- NEW IMPORT
+import Image from 'next/image';
+import { Metadata } from 'next'; // <-- IMPORT METADATA
 
-export const metadata = {
+export const metadata: Metadata = { // <-- UPDATE METADATA OBJECT
   title: 'Brillianse',
   description: 'Daily questions, daily groups.',
+  icons: {
+    icon: [
+      {
+        url: 'https://firebasestorage.googleapis.com/v0/b/brillianse-801f7.firebasestorage.app/o/logos%2FGroup%2012.png?alt=media&token=75e6d28c-5ab1-4189-bfce-9b6ed7fedaf0',
+        href: 'https://firebasestorage.googleapis.com/v0/b/brillianse-801f7.firebasestorage.app/o/logos%2FGroup%2012.png?alt=media&token=75e6d28c-5ab1-4189-bfce-9b6ed7fedaf0',
+        type: 'image/png',
+      },
+    ],
+  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -18,6 +28,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap"
           rel="stylesheet"
         />
+
+        {/* --- THE MANUAL FAVICON LINK IS NOW REMOVED --- */}
+        {/* Next.js will auto-generate the link from the metadata object */}
       </head>
       <body>
         <header className="global-header">

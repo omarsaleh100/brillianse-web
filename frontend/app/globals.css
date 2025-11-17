@@ -30,7 +30,6 @@ body {
   font-family: 'Inter', sans-serif;
   color: var(--c-text-light);
   background-color: #000;
-  /* Figma Background Gradient */
   background-image: radial-gradient(ellipse at top center, 
     var(--c-dark-purple) 0%, 
     #1a0e1c 60%, 
@@ -74,7 +73,7 @@ p {
   display: flex;
   justify-content: center;
   padding-top: 2.5rem;
-  padding-bottom: 3rem;
+  padding-bottom: 1rem;
 }
 
 .logo {
@@ -355,25 +354,36 @@ p {
   color: var(--c-text-dark);
 }
 
-
-
 /* --- NAVIGATION HEADER (Profile, Answers) --- */
 
 .profile-content-wrapper {
   display: flex;
   flex-direction: row;
   align-items: flex-start; /* Aligns button to the top */
-  justify-content: center;
-  gap: 1.5rem; /* Space between button and card */
+  justify-content: center; /* This will center the [button, form, spacer] group */
+  gap: 1.5rem; /* Space between items */
   width: 100%;
-  max-width: 800px; /* Wider to fit both */
+  max-width: 900px; /* CHANGED: Wider to fit button + form + spacer */
+}
+
+.profile-nav-wrapper {
+  flex: 1; 
+  display: flex;
+  justify-content: flex-end;
+}
+
+.profile-nav-wrapper:last-child {
+  justify-content: flex-start;
 }
 
 
 .page-nav-header {
+  position: -webkit-sticky; /* ADDED for cross-browser */
   position: sticky;
   top: 120px;
+  width: fit-content; /* ADDED: So it doesn't stretch */
 }
+
 .page-nav-header a {
   display: inline-block;
   color: var(--c-text-light);
@@ -592,50 +602,72 @@ p {
 
 .member-list {
   width: 100%;
-  max-width: 500px;
+  max-width: 960px;
+  display: flex;
+  flex-direction: row; 
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1.5rem; 
+}
+
+.member-circle-card {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-}
-.member-card {
-  display: flex;
   align-items: center;
-  gap: 1rem;
-  background: var(--c-card-bg);
-  padding: 1rem;
-  border-radius: 15px;
-  border: 1px solid var(--c-card-bg-light);
+  gap: 0.5rem;
+  background: transparent; 
+  padding: 0; 
+  border-radius: 20px;
+  border: none; 
+  width: 220px; 
 }
+
+/* NEW: Wrapper for avatar and 'you' tag */
+.member-avatar-wrapper {
+  position: relative;
+  margin-bottom: 0.05rem;
+}
+
 .member-avatar {
-  width: 60px;
-  height: 60px;
+  width: 180px;
+  height: 180px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid var(--c-card-bg-light);
+  border: 3px solid var(--c-card-bg-light);
   flex-shrink: 0;
 }
 .member-info {
-  flex-grow: 1;
+  flex-grow: 0; 
+  text-align: center;
 }
+
 .member-info h3 {
   margin: 0;
   font-size: 1.1rem;
   color: var(--c-text-light);
+  margin-bottom: 0.5rem;
 }
-.you-tag {
+
+.you-tag-circle {
+  position: absolute;
+  bottom: 0px;
+  left: 50%;
+  transform: translateX(-50%);
   font-size: 0.8rem;
-  font-weight: 500;
+  font-weight: 700;
   background: var(--c-light-purple);
   color: var(--c-text-dark);
-  padding: 0.1rem 0.4rem;
-  border-radius: 5px;
-  margin-left: 0.5rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 10px;
+  border: none;
 }
+
 .social-links {
-  margin-top: 0.5rem;
+  margin-top: 0.7rem;
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
+  justify-content: center;
 }
 .social-links a {
   font-size: 0.9rem;
@@ -657,6 +689,7 @@ p {
   padding: 1.5rem 2rem;
   border-radius: 20px;
   border: 1px solid var(--c-card-bg-light);
+  flex-shrink: 0;
 }
 .answers-list {
   margin-top: 1rem;
@@ -695,4 +728,72 @@ p {
 .answer-tag.no {
   background-color: var(--c-no);
   color: var(--c-text-dark);
+}
+/* --- SIGN-OUT CONFIRMATION MODAL --- */
+.sign-out-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px); 
+}
+
+.sign-out-modal-content {
+  width: 100%;
+  max-width: 400px; /* A bit smaller than the auth modal */
+  background: var(--c-card-bg);
+  border: 1px solid var(--c-card-bg-light);
+  padding: 2rem;
+  border-radius: 20px;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.sign-out-modal-content h2 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  color: var(--c-text-light);
+}
+
+.sign-out-modal-content p {
+  color: var(--c-text-faded);
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+/* New button style for destructive actions */
+.btn-danger {
+  padding: 0.85rem 1rem;
+  border: none;
+  cursor: pointer;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 700;
+  background: var(--c-no);
+  color: var(--c-text-dark);
+  transition: opacity 0.2s ease;
+}
+.btn-danger:hover {
+  opacity: 0.85;
+}
+
+/* Re-using the .btn-secondary style for "Cancel" */
+.modal-actions .btn-secondary {
+  padding: 0.85rem 1rem;
 }
