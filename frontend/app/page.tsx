@@ -16,16 +16,14 @@ import {
 } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 
-function getTodayDate() {
-  return new Date().toISOString().split('T')[0];
-}
-
 export default function Home() {
   const [questions, setQuestions] = useState<string[]>([]);
   const [answers, setAnswers] = useState<{ [key: number]: string }>({});
   
-  const [isCheckingUser, setIsCheckingUser] = useState(true);
-  const [isFetchingQuestions, setIsFetchingQuestions] = useState(true);
+  // --- Source of Truth for the "Current" Game Date ---
+  const [gameDate, setGameDate] = useState<string | null>(null);
+
+  const [isLoading, setIsLoading] = useState(true); 
   const [error, setError] = useState<string | null>(null);
   
   const [user, setUser] = useState<User | null>(null);
@@ -45,36 +43,81 @@ export default function Home() {
   
   const router = useRouter();
 
-  const resetQuestionState = () => {
-    setAnswers({});
-    setCurrentQuestionIndex(0);
-    setGroupId(null);
-    setShowAuthForm(false);
-    setShowGroupFullModal(false);
-    setError(null);
-    setAuthError(null);
-    setConfirmPassword('');
-    setAuthMode('signup');
-  };
-
-  // --- 1. Listen for user auth changes ---
-  // --- 1. Listen for user auth changes ---
+  // --- 1. Initialization: Fetch Game Config & Check User Status ---
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      
-      // If no user is found, we are done checking. 
-      // If a user IS found, the "Check if user has already played" effect will handle the loading state.
-      if (!currentUser) {
-        setIsCheckingUser(false);
+    const init = async () => {
+      setIsLoading(true);
+      try {
+        // A. Fetch the "Master" Game Configuration first
+        const configRef = doc(db, 'config', 'daily');
+        const configSnap = await getDoc(configRef);
+
+        if (!configSnap.exists()) {
+          throw new Error("Daily questions not found.");
+        }
+
+        const configData = configSnap.data();
+        const activeDate = configData.date; // e.g., "2025-11-19"
+        
+        if (!activeDate) {
+             throw new Error("Configuration is missing the date.");
+        }
+
+        setQuestions(configData.questions || []);
+        setGameDate(activeDate);
+        setCurrentQuestionIndex(0);
+
+        // B. Handle User State
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+          setUser(currentUser);
+
+          if (currentUser) {
+            // Check user's specific data against the activeDate
+            const userRef = doc(db, 'users', currentUser.uid);
+            const userSnap = await getDoc(userRef);
+            
+            if (userSnap.exists()) {
+              const userData = userSnap.data();
+
+              // 1. Incomplete Profile -> Profile Page
+              if (!userData.isProfileComplete) {
+                router.push('/profile');
+                return;
+              }
+
+              // 2. If User has a dailyGroup AND the date matches the Active Game Date
+              // If the dates DON'T match, we fall through to show the questions (Lazy Reset)
+              if (userData.dailyGroup && userData.dailyGroup.date === activeDate) {
+                router.push(`/group/${userData.dailyGroup.groupId}`);
+                return;
+              }
+
+              // 3. If User has groupFull for THIS Active Date
+              if (userData.groupFull && userData.groupFull.date === activeDate) {
+                setShowGroupFullModal(true);
+                setIsLoading(false);
+                return;
+              }
+            }
+          }
+          
+          // If no user, OR user exists but hasn't played for *this specific activeDate*
+          // we reveal the questions to let them play.
+          setIsLoading(false);
+        });
+
+        return () => unsubscribe();
+      } catch (err: any) {
+        console.error(err);
+        setError("Failed to load the game. Please try refreshing.");
+        setIsLoading(false);
       }
-    });
+    };
 
-    // Cleanup subscription on unmount
-    return () => unsubscribe();
-  }, []);
+    init();
+  }, [router]);
 
-  // --- 1.5 Handle Body Scroll (Separate Effect) ---
+  // --- Scroll Lock Management ---
   useEffect(() => {
     if (showAuthForm) {
       document.body.classList.remove('no-scroll');
@@ -83,85 +126,6 @@ export default function Home() {
     }
     return () => document.body.classList.remove('no-scroll');
   }, [showAuthForm]);
-
-  // --- 2. Check if user has already played ---
-  useEffect(() => {
-    const checkUserStatus = async () => {
-      // If no user, stop checking user status
-      if (!user) {
-        setIsCheckingUser(false);
-        return;
-      }
-      const userRef = doc(db, 'users', user.uid);
-      const userSnap = await getDoc(userRef);
-      const today = getTodayDate();
-
-      if (userSnap.exists()) {
-        const userData = userSnap.data();
-
-        if (!userData.isProfileComplete) {
-          router.push('/profile');
-          return; 
-        }
-
-        if (userData.groupFull && userData.groupFull.date === today) {
-          setShowGroupFullModal(true); 
-          setIsCheckingUser(false);    
-          return;                     
-        }
-        
-        if (userData.dailyGroup && userData.dailyGroup.date === today) {
-          router.push(`/group/${userData.dailyGroup.groupId}`);
-          return;
-        }
-      }
-    
-      setIsCheckingUser(false); 
-    };
-    checkUserStatus();
-  }, [user, router]);
-
-  // --- 3. Fetch daily questions ---
-  useEffect(() => {
-    // Only fetch after we've confirmed user status
-    if (isCheckingUser) return;
-
-    const fetchQuestions = async () => {
-      try {
-        setIsFetchingQuestions(true);
-        const docRef = doc(db, 'config', 'daily');
-        const docSnap = await getDoc(docRef);
-        
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          // Check if the date matches today
-          if (data.date === getTodayDate()) {
-            setQuestions(data.questions || []);
-            setCurrentQuestionIndex(0); 
-          } else {
-            // Data exists but it's old
-            setError('Questions for today are not ready yet. Check back soon!');
-          }
-        } else {
-          // Document doesn't exist at all
-          setError('Questions for today are not ready yet. Check back soon!');
-        }
-      } catch (err) {
-        console.error(err);
-        setError('Failed to load questions. Please try refreshing.');
-      } finally {
-        setIsFetchingQuestions(false);
-      }
-    };
-    fetchQuestions();
-  }, [isCheckingUser]);
-
-  useEffect(() => {
-    document.body.classList.add('no-scroll');
-    return () => {
-      document.body.classList.remove('no-scroll');
-    };
-  }, []);
 
   const handleAnswer = async (questionIndex: number, answer: string) => {
     const newAnswers = { ...answers, [questionIndex]: answer };
@@ -172,13 +136,13 @@ export default function Home() {
       setGroupId(finalGroupId);
 
       if (user) {
+        // If logged in, immediately assign to group using the ACTIVE gameDate
         const status = await assignUserToGroup(user, finalGroupId, newAnswers);
         if (status === 'full') {
           setShowGroupFullModal(true);
         } else if (status === 'success') {
           const userSnap = await getDoc(doc(db, 'users', user.uid));
           const userData = userSnap.data();
-          setShowAuthForm(false);
           if (userData?.isProfileComplete) {
             router.push(`/group/${finalGroupId}`);
           } else {
@@ -186,6 +150,7 @@ export default function Home() {
           }
         }
       } else {
+        // If not logged in, show auth form
         setShowAuthForm(true);
       }
     } else {
@@ -213,33 +178,24 @@ export default function Home() {
       }
       
       const loggedInUser = userCredential.user;
-      const today = getTodayDate();
       const userRef = doc(db, 'users', loggedInUser.uid);
       
-      const userSnap = await getDoc(userRef);
-      let userData = userSnap.exists() ? userSnap.data() : null;
-
-      if (userData) {
-        if (userData.groupFull && userData.groupFull.date === today) {
-          setShowAuthForm(false);
-          setShowGroupFullModal(true);
-          return;
-        }
-        if (userData.dailyGroup && userData.dailyGroup.date === today) {
-          setShowAuthForm(false); 
-          return; 
-        }
-      }
-
+      // Create default doc if signing up
       if (isSigningUp) {
         await setDoc(userRef, {
           email: loggedInUser.email,
           isProfileComplete: false,
           username: loggedInUser.email?.split('@')[0] || `user${Date.now()}`
         }, { merge: true });
-        const newUserSnap = await getDoc(userRef);
-        userData = newUserSnap.data() || null; 
       }
+      
+      // Check if profile is complete
+      const userSnap = await getDoc(userRef);
+      const userData = userSnap.exists() ? userSnap.data() : null;
+
+      // Note: We DO NOT check for existing groups here based on 'today'.
+      // We proceed to assign them based on the answers they JUST provided.
+      // This overwrites any old stale data they might have had.
 
       if (groupId) {
         const status = await assignUserToGroup(loggedInUser, groupId, answers); 
@@ -255,6 +211,7 @@ export default function Home() {
           }
         }
       } else {
+        // Edge case fallback
         router.refresh(); 
       }
     } catch (err: any) {
@@ -279,13 +236,12 @@ export default function Home() {
     try {
       const result = await signInWithPopup(auth, provider);
       const loggedInUser = result.user;
-      const today = getTodayDate();
       const userRef = doc(db, 'users', loggedInUser.uid);
       
       const userSnap = await getDoc(userRef);
       let userData = userSnap.exists() ? userSnap.data() : null;
 
-      if (!userSnap.exists()) {
+      if (!userData) {
         userData = {
           email: loggedInUser.email,
           isProfileComplete: false,
@@ -293,18 +249,6 @@ export default function Home() {
           profilePictureUrl: loggedInUser.photoURL || null,
         };
         await setDoc(userRef, userData, { merge: true });
-      }
-
-      if (userData) {
-        if (userData.groupFull && userData.groupFull.date === today) {
-          setShowAuthForm(false);
-          setShowGroupFullModal(true);
-          return;
-        }
-        if (userData.dailyGroup && userData.dailyGroup.date === today) {
-          router.push(`/group/${userData.dailyGroup.groupId}`);
-          return;
-        }
       }
 
       if (groupId) {
@@ -323,7 +267,6 @@ export default function Home() {
       } else {
         router.refresh();
       }
-
     } catch (err: any) {
       console.error("Google join error:", err);
       setAuthError("Failed to sign in with Google.");
@@ -333,6 +276,7 @@ export default function Home() {
   const handleSignOut = async () => {
     try {
       await signOut(auth);
+      window.location.reload();
     } catch (err) {
       console.error('Failed to sign out:', err);
       setError('Failed to sign out.');
@@ -345,18 +289,23 @@ export default function Home() {
     }
   };
 
+  // --- Transaction to Assign Group (Uses gameDate) ---
   const assignUserToGroup = async (
     currentUser: User, 
     finalGroupId: string,
     rawAnswers: { [key: number]: string }
   ): Promise<'success' | 'full'> => {
-    if (!currentUser || !finalGroupId) return 'success';
-    const today = getTodayDate();
+    // Ensure we have the Game Date loaded
+    if (!currentUser || !finalGroupId || !gameDate) {
+        console.error("Missing data for assignment");
+        return 'success';
+    }
+    
     const userRef = doc(db, 'users', currentUser.uid);
 
     try {
       const status = await runTransaction(db, async (transaction) => {
-        const groupRef = doc(db, `daily_groups/${today}/groups`, finalGroupId);
+        const groupRef = doc(db, `daily_groups/${gameDate}/groups`, finalGroupId);
         const groupSnap = await transaction.get(groupRef);
         
         let members: string[] = [];
@@ -366,14 +315,17 @@ export default function Home() {
 
         if (members.length >= 10 && !members.includes(currentUser.uid)) {
           transaction.set(userRef, {
-            groupFull: { date: today }
+            groupFull: { date: gameDate }
           }, { merge: true });
           return 'full';
         }
 
         const answersAsArray = questions.map((_, index) => rawAnswers[index]);
+        
+        // Overwrite the dailyGroup with the NEW gameDate.
+        // This effectively resets the user's status to the new day.
         const dailyGroupData = {
-          date: today,
+          date: gameDate,
           groupId: finalGroupId,
           answers: answersAsArray
         };
@@ -399,11 +351,9 @@ export default function Home() {
     }
   };
 
-  // --- LOADING STATE (RENDER THIS IF FETCHING) ---
-  if (isCheckingUser || isFetchingQuestions) {
+  if (isLoading) {
     return (
       <main className="loading-container">
-        {/* This will appear inside the fadeInPage animation */}
         <p>Loading today's questions...</p>
       </main>
     );
@@ -476,6 +426,10 @@ export default function Home() {
               </p>
             </>
           )}
+          {/* Close Button/Cancel for Auth Form */}
+           <button onClick={() => setShowAuthForm(false)} className="btn-secondary" style={{marginTop:'1rem'}}>
+             Cancel
+           </button>
         </div>
       )}
 
@@ -494,22 +448,21 @@ export default function Home() {
         </div>
       )}
 
-      {/* --- MAIN CONTENT LOGIC --- */}
+      {/* Main Content Logic */}
       
-      {/* 1. If we have an error (e.g. no questions) */}
+      {/* 1. Error State */}
       {error && (
         <div className="error-container">
           <h2>No Questions Yet</h2>
           <p>{error}</p>
-          {/* Optional: Add a button to manual refresh if needed */}
           <button onClick={() => window.location.reload()} className="btn-secondary" style={{marginTop: '1rem'}}>
             Refresh
           </button>
         </div>
       )}
 
-      {/* 2. If we have questions, show the quiz */}
-      {questions.length > 0 && !showAuthForm && !error && (
+      {/* 2. Questions UI */}
+      {questions.length > 0 && !showAuthForm && !error && !showGroupFullModal && (
         <div className="question-form">
           <div className="progress-indicator">
             <div className="progress-dots-container">

@@ -8,14 +8,10 @@ import { onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
-function getTodayDate() {
-  return new Date().toISOString().split('T')[0];
-}
-
 type UserProfile = {
   id: string;
-  name: string;     // <-- NEW: Real Name
-  username: string; // <-- Existing: Handle
+  name: string;     // Real Name
+  username: string; // Handle
   email: string;
   profilePictureUrl?: string;
   socials: {
@@ -56,16 +52,44 @@ export default function GroupPage() {
 
   useEffect(() => {
     if (!groupId || !user) return;
+    
     const fetchGroupData = async () => {
       try {
         setLoading(true);
         setError(null);
-        const today = getTodayDate();
+
+        // 1. Fetch the "Master" Config to get the OFFICIAL date
+        const configRef = doc(db, 'config', 'daily');
+        const configSnap = await getDoc(configRef);
         
-        const groupRef = doc(db, `daily_groups/${today}/groups`, groupId);
+        if (!configSnap.exists()) {
+             throw new Error('System configuration missing.');
+        }
+        
+        const todayDate = configSnap.data().date; // This is the Server's Game Date
+
+        // 2. Verify the User is allowed to be here for THIS date
+        // If their stored group date doesn't match the Server Game Date, they need to replay.
+        const userRef = doc(db, 'users', user.uid);
+        const userSnap = await getDoc(userRef);
+        
+        if (userSnap.exists()) {
+            const userData = userSnap.data();
+            if (userData.dailyGroup?.date !== todayDate) {
+                // Their group data is stale (from yesterday). Redirect to home to reset.
+                router.push('/');
+                return;
+            }
+        }
+
+        // 3. Fetch the group using the SERVER date
+        const groupRef = doc(db, `daily_groups/${todayDate}/groups`, groupId);
         const groupSnap = await getDoc(groupRef);
+        
         if (!groupSnap.exists()) {
-          throw new Error('This group does not exist or has not been formed yet.');
+           // Group doesn't exist for today -> Redirect Home
+           router.push('/');
+           return;
         }
 
         const memberIds: string[] = groupSnap.data().members || [];
@@ -75,6 +99,7 @@ export default function GroupPage() {
            return;
         }
 
+        // 4. Fetch Profiles
         const profilePromises = memberIds.map(id => 
           getDoc(doc(db, 'users', id))
         );
@@ -86,7 +111,6 @@ export default function GroupPage() {
             const data = docSnap.data() as DocumentData;
             return {
               id: docSnap.id,
-              // Fallback to username if name is missing (for old accounts)
               name: data.name || data.username || 'Anonymous', 
               username: data.username || 'user',
               email: data.email,
@@ -94,6 +118,7 @@ export default function GroupPage() {
               socials: data.socials || {},
             };
           });
+          
           const sortedMembers = memberProfiles.sort((a, b) => {
             if (a.id === user.uid) return -1; 
             if (b.id === user.uid) return 1;
