@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
-import { db, auth, storage } from '../../lib/firebase'; // <-- Import storage
-import { doc, getDoc, setDoc, collection, query, where, getDocs} from 'firebase/firestore';
+import { db, auth, storage } from '../../lib/firebase';
+import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { onAuthStateChanged, User, signOut, sendEmailVerification } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -26,7 +26,11 @@ export default function Profile() {
   const [isEmailVerified, setIsEmailVerified] = useState(true);
   const [verificationSent, setVerificationSent] = useState(false);
 
+  // --- FIXED: Restored Modal State ---
+  const [showSignOutModal, setShowSignOutModal] = useState(false);
+
   const [form, setForm] = useState({
+    name: '',
     username: '',
     twitter: '',
     linkedin: '',
@@ -59,12 +63,29 @@ export default function Profile() {
           setIsProfileComplete(data.isProfileComplete || false);
 
           let suggestedUsername = data.username || '';
-          if (!data.isProfileComplete) {
-            const name = currentUser.email?.split('@')[0].replace(/[^a-zA-Z0-9]/g, '') || 'user';
-            suggestedUsername = `${name}${Math.floor(100 + Math.random() * 900)}`;
+          
+          if (!data.isProfileComplete && !suggestedUsername) {
+            const emailBase = currentUser.email?.split('@')[0]
+              .replace(/[^a-zA-Z0-9]/g, '')
+              .toLowerCase() || 'user';
+            
+            try {
+              const q = query(collection(db, 'users'), where('username', '==', emailBase));
+              const querySnapshot = await getDocs(q);
+              
+              if (querySnapshot.empty) {
+                suggestedUsername = emailBase;
+              } else {
+                suggestedUsername = `${emailBase}${Math.floor(100 + Math.random() * 900)}`;
+              }
+            } catch (e) {
+              suggestedUsername = `${emailBase}${Math.floor(100 + Math.random() * 900)}`;
+            }
           }
+
           setForm({
-            username: data.username || suggestedUsername,
+            name: data.name || '',
+            username: suggestedUsername,
             twitter: data.socials?.twitter || '',
             linkedin: data.socials?.linkedin || '',
             instagram: data.socials?.instagram || '',
@@ -84,27 +105,27 @@ export default function Profile() {
 
   useEffect(() => {
     if (!user || isEmailVerified) {
-      return; // Don't run if no user or if already verified
+      return; 
     }
-
-    // Set up an interval to check every 3 seconds
     const interval = setInterval(async () => {
-      await user.reload(); // Get fresh data
-      
+      await user.reload(); 
       if (user.emailVerified) {
         setIsEmailVerified(true);
-        clearInterval(interval); // Stop polling
+        clearInterval(interval); 
       }
-    }, 3000); // Check every 3 seconds
-
-    // Clean up the interval when the component unmounts or state changes
+    }, 3000); 
     return () => clearInterval(interval);
-
   }, [user, isEmailVerified]);
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
-    setForm(prev => ({ ...prev, [id]: value }));
+    
+    let newValue = value;
+    if (id === 'username') {
+      newValue = value.toLowerCase().replace(/\s/g, '');
+    }
+
+    setForm(prev => ({ ...prev, [id]: newValue }));
   };
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -124,8 +145,13 @@ export default function Profile() {
     setSuccessMessage(null);
     setValidationError(null);
 
-    const { username, twitter, linkedin, instagram } = form;
-    if (!username) {
+    const { name, username, twitter, linkedin, instagram } = form;
+
+    if (!name.trim()) {
+      setValidationError('Name is required.');
+      return;
+    }
+    if (!username.trim()) {
       setValidationError('Username is required.');
       return;
     }
@@ -135,23 +161,19 @@ export default function Profile() {
     }
 
     try {
-      // --- START OF UNIQUENESS CHECK ---
       const userRef = doc(db, 'users', user.uid);
       const userSnap = await getDoc(userRef);
       const oldUsername = userSnap.exists() ? userSnap.data().username : null;
 
-      // Only check for uniqueness if the username has actually changed
       if (oldUsername !== username) {
         const q = query(collection(db, 'users'), where('username', '==', username));
         const querySnapshot = await getDocs(q);
         
         if (!querySnapshot.empty) {
-          // A document already exists with this username
           setValidationError('Username is already taken. Please try again.');
-          return; // Stop the save
+          return; 
         }
       }
-      // --- END OF UNIQUENESS CHECK ---
 
       let finalProfilePicUrl = profilePicUrl; 
 
@@ -184,6 +206,7 @@ export default function Profile() {
       }
       
       await setDoc(userRef, {
+        name: name,
         username: username,
         email: user.email,
         socials: {
@@ -220,17 +243,20 @@ export default function Profile() {
     try {
       await sendEmailVerification(user);
       setVerificationSent(true);
-      // Hide the "sent" message after a few seconds
       setTimeout(() => setVerificationSent(false), 3000);
     } catch (err) {
       console.error("Failed to resend verification:", err);
     }
   };
 
-  // --- 3. Handle Sign Out ---
-  const handleSignOut = async () => {
+  const handleSignOut = () => {
+    setShowSignOutModal(true);
+  };
+
+  const confirmSignOut = async () => {
     try {
       await signOut(auth);
+      setShowSignOutModal(false);
     } catch (err) {
       console.error('Failed to sign out:', err);
     }
@@ -241,15 +267,13 @@ export default function Profile() {
   }
 
   return (
-    <main> {/* This is the main flex-column container */}
+    <main>
       <Head>
         <title>My Profile</title>
       </Head>
 
-      {/* --- NEW: Wrapper for side-by-side layout --- */}
       <div className="profile-content-wrapper">
 
-        {/* --- MODIFIED: Wrapper for the button --- */}
         <div className="profile-nav-wrapper">
           {dailyGroupId && isProfileComplete && (
             <div className="page-nav-header">
@@ -259,7 +283,6 @@ export default function Profile() {
             </div>
           )}
         </div>
-        {/* ---------------------------- */}
 
         <form onSubmit={handleSave} className="profile-form">
           <h1>Your Profile</h1>
@@ -302,29 +325,64 @@ export default function Profile() {
           )}
 
           <div className="input-group">
-            <label htmlFor="username">Username</label>
-            <input id="username" type="text" value={form.username} onChange={handleChange} />
+            <label htmlFor="name">Name (Required)</label>
+            <input 
+              id="name" 
+              type="text" 
+              value={form.name} 
+              onChange={handleChange} 
+              placeholder="e.g. John Doe" 
+            />
           </div>
+
           <div className="input-group">
-            <label htmlFor="twitter">Twitter Handle</label>
-            <input id="twitter" type="text" value={form.twitter} onChange={handleChange} />
+            <label htmlFor="username">Username (Required)</label>
+            <input 
+              id="username" 
+              type="text" 
+              value={form.username} 
+              onChange={handleChange} 
+              placeholder="e.g. johndoe123" 
+            />
+          </div>
+
+          <div className="input-group">
+            <label htmlFor="twitter">X (Twitter) Handle</label>
+            <input 
+              id="twitter" 
+              type="text" 
+              value={form.twitter} 
+              onChange={handleChange} 
+              placeholder="e.g. @username" 
+            />
           </div>
           <div className="input-group">
             <label htmlFor="linkedin">LinkedIn Profile</label>
-            <input id="linkedin" type="text" value={form.linkedin} onChange={handleChange} />
+            <input 
+              id="linkedin" 
+              type="text" 
+              value={form.linkedin} 
+              onChange={handleChange} 
+              placeholder="e.g. linkedin.com/in/username" 
+            />
           </div>
           <div className="input-group">
             <label htmlFor="instagram">Instagram Handle</label>
-            <input id="instagram" type="text" value={form.instagram} onChange={handleChange} placeholder="@username" />
+            <input 
+              id="instagram" 
+              type="text" 
+              value={form.instagram} 
+              onChange={handleChange} 
+              placeholder="e.g. @username" 
+            />
           </div>
 
           <button type="submit" className="btn-submit" disabled={isUploading}>
             {isUploading ? `Uploading... ${uploadProgress.toFixed(0)}%` : 'Save Profile'}
           </button>
         </form>
+        
         <div className="profile-nav-wrapper">
-          {/* This spacer is intentionally left empty */}
-          {/* It will take up the same space as the button wrapper */}
           {dailyGroupId && isProfileComplete && (
             <div className="page-nav-header" style={{ visibility: 'hidden' }}>
               <Link href={`/group/${dailyGroupId}`}>
@@ -334,12 +392,28 @@ export default function Profile() {
           )}
         </div>
       </div>
-      {/* --- End of new wrapper --- */}
-
 
       <button onClick={handleSignOut} className="btn-sign-out-profile" disabled={isUploading}>
         Sign Out
       </button>
+
+      {showSignOutModal && (
+        <div className="sign-out-modal-overlay">
+          <div className="sign-out-modal-content">
+            <h2>Are you sure?</h2>
+            <p>This will sign you out of your account.</p>
+            <div className="modal-actions">
+              <button onClick={confirmSignOut} className="btn-danger">
+                Sign Out
+              </button>
+              <button onClick={() => setShowSignOutModal(false)} className="btn-secondary">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </main>
   );
 }

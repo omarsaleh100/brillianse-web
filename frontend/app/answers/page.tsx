@@ -125,17 +125,19 @@ export default function AnswersPage() {
               </div>
             ))}
           </div>
+        
+      </div>
+      <div className="profile-nav-wrapper">
+          {groupId && (
+            <div className="page-nav-header" style={{ visibility: 'hidden' }}>
+              <Link href={`/group/${groupId}`}>
+                &larr;
+              </Link>
+            </div>
+          )}
         </div>
-        {groupId && (
-          <div className="page-nav-header" style={{ visibility: 'hidden' }}>
-          <Link href={`/group/${groupId}`}>
-            &larr;
-          </Link>
-        </div>
-        )}
+        
       </div> 
-      {/* --- END: Added wrapper div --- */}
-      
     </main>
   );
 }

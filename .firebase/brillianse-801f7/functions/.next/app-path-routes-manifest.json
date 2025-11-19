@@ -1,0 +1,8 @@
+{
+  "/_global-error/page": "/_global-error",
+  "/_not-found/page": "/_not-found",
+  "/answers/page": "/answers",
+  "/group/[groupId]/page": "/group/[groupId]",
+  "/page": "/",
+  "/profile/page": "/profile"
+}

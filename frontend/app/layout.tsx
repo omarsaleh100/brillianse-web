@@ -1,32 +1,25 @@
-'use client';
-
 import './globals.css';
-import { ReactNode, useState, useEffect } from 'react'; // <-- MODIFIED
+import { ReactNode } from 'react';
 import Image from 'next/image';
 import { Metadata } from 'next';
 
-const metadata: Metadata = { // <-- UPDATE METADATA OBJECT
+export const metadata: Metadata = {
   title: 'Brillianse',
   description: 'Daily questions, daily groups.',
-  
+};
+
+export const viewport = {
+  themeColor: '#502754', 
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    // Set a timer for 1 second
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 1000); // 1000ms = 1 second
-
-    // Clean up the timer if the component unmounts
-    return () => clearTimeout(timer);
-  }, []); // The empty array ensures this runs only once on mount
   return (
     <html lang="en">
       <head>
-        {/* We add the 'Inter' font link here */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
@@ -40,27 +33,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         />
       </head>
       
-      {/* --- BODY MODIFIED --- */}
       <body>
-        
-        {/* --- 1. LOADING OVERLAY --- */}
-        {/* This div will be on top, spin, and fade out */}
-        <div className={`app-loading-overlay ${isLoading ? 'visible' : 'hidden'}`}>
-          <div className="logo loading-logo">
-            <Image
-              src="https://firebasestorage.googleapis.com/v0/b/brillianse-801f7.firebasestorage.app/o/logos%2FBrillianse%20(3)%20(1).png?alt=media&token=660301a4-d4b3-4200-b51d-ba3af4069cda"
-              alt="Brillianse Logo"
-              width={50}
-              height={50}
-              className="logo-img"
-              priority 
-            />
-          </div>
-        </div>
-
-        {/* --- 2. MAIN CONTENT --- */}
-        {/* This div will be underneath and will fade in */}
-        <div className={`app-content-wrapper ${isLoading ? 'hidden' : 'visible'}`}>
+        <div className="app-content-wrapper">
           <header className="global-header">
             <div className="logo">
               <Image
@@ -69,7 +43,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 width={50}
                 height={50}
                 className="logo-img"
-                priority // Load the logo first
+                priority
               />
             </div>
           </header>
@@ -77,7 +51,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             {children}
           </main>
         </div>
-        
       </body>
     </html>
   );

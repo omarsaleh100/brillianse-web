@@ -41,7 +41,6 @@ export default function Home() {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showGroupFullModal, setShowGroupFullModal] = useState(false);
   
-  // --- Question Flow State ---
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   
   const router = useRouter();
@@ -60,21 +59,24 @@ export default function Home() {
 
   // --- 1. Listen for user auth changes ---
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      if (currentUser) {
-        setShowLoginModal(false);
-      } else {
-        resetQuestionState();
-      }
-    });
-    return () => unsubscribe();
-  }, []); 
+    // If the auth form is showing, allow scrolling (remove the class)
+    if (showAuthForm) {
+      document.body.classList.remove('no-scroll');
+    } else {
+      // Otherwise (during questions), lock scrolling
+      document.body.classList.add('no-scroll');
+    }
 
-  // --- 2. Check if user has already played today ---
-  // --- 2. Check if user has already played or was blocked ---
+    // Cleanup: always remove the class when unmounting or changing state
+    return () => {
+      document.body.classList.remove('no-scroll');
+    };
+  }, [showAuthForm]); // <-- Dependency added here
+
+  // --- 2. Check if user has already played ---
   useEffect(() => {
     const checkUserStatus = async () => {
+      // If no user, stop checking user status
       if (!user) {
         setIsCheckingUser(false);
         return;
@@ -86,21 +88,17 @@ export default function Home() {
       if (userSnap.exists()) {
         const userData = userSnap.data();
 
-        // --- PRIORITY 1: Check if profile is incomplete ---
-        // This must be the *first* check for any logged-in user.
         if (!userData.isProfileComplete) {
           router.push('/profile');
-          return; // Send them to profile regardless of group status
+          return; 
         }
 
-        // --- PRIORITY 2: Check if user was blocked today ---
         if (userData.groupFull && userData.groupFull.date === today) {
-          setShowGroupFullModal(true); // Show the "group full" modal
-          setIsCheckingUser(false);    // Stop loading
-          return;                     // Stop processing
+          setShowGroupFullModal(true); 
+          setIsCheckingUser(false);    
+          return;                     
         }
         
-        // --- PRIORITY 3: Check if user is already in a group ---
         if (userData.dailyGroup && userData.dailyGroup.date === today) {
           router.push(`/group/${userData.dailyGroup.groupId}`);
           return;
@@ -114,26 +112,32 @@ export default function Home() {
 
   // --- 3. Fetch daily questions ---
   useEffect(() => {
+    // Only fetch after we've confirmed user status
     if (isCheckingUser) return;
+
     const fetchQuestions = async () => {
       try {
         setIsFetchingQuestions(true);
         const docRef = doc(db, 'config', 'daily');
         const docSnap = await getDoc(docRef);
+        
         if (docSnap.exists()) {
           const data = docSnap.data();
+          // Check if the date matches today
           if (data.date === getTodayDate()) {
-            setQuestions(data.questions);
-            setCurrentQuestionIndex(0); // Start at first question
+            setQuestions(data.questions || []);
+            setCurrentQuestionIndex(0); 
           } else {
-            setError('tryna fix something, will be back...'); // <-- CHANGED
+            // Data exists but it's old
+            setError('Questions for today are not ready yet. Check back soon!');
           }
         } else {
-          setError('tryna fix something, will be back...'); // <-- CHANGED
+          // Document doesn't exist at all
+          setError('Questions for today are not ready yet. Check back soon!');
         }
       } catch (err) {
         console.error(err);
-        setError('tryna fix something, will be back...'); // <-- CHANGED
+        setError('Failed to load questions. Please try refreshing.');
       } finally {
         setIsFetchingQuestions(false);
       }
@@ -141,43 +145,26 @@ export default function Home() {
     fetchQuestions();
   }, [isCheckingUser]);
 
-  // This hook adds/removes a class to the <body> tag to disable scrolling
   useEffect(() => {
-    // On mount, add the class
     document.body.classList.add('no-scroll');
-
-    // On unmount (when user navigates away), remove the class
     return () => {
       document.body.classList.remove('no-scroll');
     };
   }, []);
 
-  // --- 4. Handle Answer Selection & Flow ---
   const handleAnswer = async (questionIndex: number, answer: string) => {
-    // 1. Save the new answer
-    const newAnswers = {
-      ...answers,
-      [questionIndex]: answer
-    };
+    const newAnswers = { ...answers, [questionIndex]: answer };
     setAnswers(newAnswers);
 
-    // 2. Update progress bar
-    const newProgress = ((questionIndex + 1) / questions.length) * 100;
-
-    // 3. Check if we are on the last question
     if (questionIndex === questions.length - 1) {
-      // --- This is the end of the quiz ---
       const finalGroupId = questions.map((_, index) => newAnswers[index] === 'yes' ? '1' : '0').join('');
       setGroupId(finalGroupId);
 
       if (user) {
-        // If user is logged in, attempt to assign them
-        const status = await assignUserToGroup(user, finalGroupId, newAnswers); // <-- MODIFIED
-        
-        if (status === 'full') { // <-- ADD THIS BLOCK
+        const status = await assignUserToGroup(user, finalGroupId, newAnswers);
+        if (status === 'full') {
           setShowGroupFullModal(true);
         } else if (status === 'success') {
-          // Check profile complete and redirect
           const userSnap = await getDoc(doc(db, 'users', user.uid));
           const userData = userSnap.data();
           setShowAuthForm(false);
@@ -188,23 +175,20 @@ export default function Home() {
           }
         }
       } else {
-        // If user is not logged in, show the auth form
         setShowAuthForm(true);
       }
     } else {
-      // --- Move to the next question ---
       setCurrentQuestionIndex(prev => prev + 1);
     }
   };
 
-  // --- 5. Handle auth *after* answering ---
   const handleAuth = async (isSigningUp: boolean) => {
     if (!email || !password) {
       setAuthError('Please enter email and password.');
       return;
     }
     if (isSigningUp && password !== confirmPassword) {
-      setAuthError('Passwords do not match. Please try again.');
+      setAuthError('Passwords do not match.');
       return;
     }
     setAuthError(null);
@@ -221,29 +205,21 @@ export default function Home() {
       const today = getTodayDate();
       const userRef = doc(db, 'users', loggedInUser.uid);
       
-      // --- NEW, CRITICAL PRE-JOIN CHECK ---
       const userSnap = await getDoc(userRef);
       let userData = userSnap.exists() ? userSnap.data() : null;
 
       if (userData) {
-        // 1. Check if they are already blocked for the day
         if (userData.groupFull && userData.groupFull.date === today) {
-          console.log("User already marked as 'groupFull' for today. Blocking join.");
           setShowAuthForm(false);
-          setShowGroupFullModal(true); // Show the "group full" modal
-          return; // STOP HERE. Do not assign to the new group.
+          setShowGroupFullModal(true);
+          return;
         }
-        // 2. Check if they are already in a group for the day (edge case)
         if (userData.dailyGroup && userData.dailyGroup.date === today) {
-          console.log("User already in a group for today. Redirecting.");
           setShowAuthForm(false); 
-          // The onAuthStateChanged listener and useEffect 2 will handle the redirect.
           return; 
         }
       }
-      // --- END OF PRE-JOIN CHECK ---
 
-      // If this is a new user, create their doc stub
       if (isSigningUp) {
         await setDoc(userRef, {
           email: loggedInUser.email,
@@ -254,11 +230,8 @@ export default function Home() {
         userData = newUserSnap.data() || null; 
       }
 
-      // If they passed all checks, proceed with assigning them to the *new* group.
       if (groupId) {
-        // This 'status' check is now a safety net for race conditions.
         const status = await assignUserToGroup(loggedInUser, groupId, answers); 
-
         if (status === 'full') { 
           setShowAuthForm(false); 
           setShowGroupFullModal(true); 
@@ -271,51 +244,24 @@ export default function Home() {
           }
         }
       } else {
-        // Should not happen in this flow, but good to have.
         router.refresh(); 
       }
     } catch (err: any) {
       console.error("Auth error:", err);
-      // Check for specific Firebase auth error codes
       if (err.code === 'auth/email-already-in-use') {
-        setAuthError('This email is already in use. Please try logging in.');
+        setAuthError('This email is already in use.');
       } else if (err.code === 'auth/weak-password') {
-        setAuthError('Password is too weak. It must be at least 6 characters.');
+        setAuthError('Password must be at least 6 characters.');
       } else if (err.code === 'auth/invalid-email') {
         setAuthError('Please enter a valid email address.');
       } else if (err.code === 'auth/invalid-credential') {
-        setAuthError('Invalid email or password. Please try again.');
+        setAuthError('Invalid email or password.');
       } else {
-        // A generic fallback for other errors
         setAuthError('An error occurred. Please try again.');
       }
     }
   };
 
-  const handleSignOut = async () => {
-    try {
-      await signOut(auth);
-      // The onAuthStateChanged listener will now handle the state reset.
-    } catch (err) {
-      console.error('Failed to sign out:', err);
-      setError('Failed to sign out. Please try again.');
-    }
-  };
-
-  // --- NEW: Handle Google Sign-in for the *Login Modal* ---
-  const handleGoogleLogin = async () => {
-    setAuthError(null);
-    const provider = new GoogleAuthProvider();
-    try {
-      await signInWithPopup(auth, provider);
-      // onAuthStateChanged will handle closing the modal and redirecting
-    } catch (err: any) {
-      console.error("Google login error:", err);
-      setAuthError("Failed to sign in with Google. Please try again.");
-    }
-  };
-
-  // --- NEW: Handle Google Sign-in for the *Post-Quiz Form* ---
   const handleGoogleJoin = async () => {
     setAuthError(null);
     const provider = new GoogleAuthProvider();
@@ -329,7 +275,6 @@ export default function Home() {
       let userData = userSnap.exists() ? userSnap.data() : null;
 
       if (!userSnap.exists()) {
-        // This is a new user, create their doc
         userData = {
           email: loggedInUser.email,
           isProfileComplete: false,
@@ -339,7 +284,6 @@ export default function Home() {
         await setDoc(userRef, userData, { merge: true });
       }
 
-      // Pre-join checks (same as in handleAuth)
       if (userData) {
         if (userData.groupFull && userData.groupFull.date === today) {
           setShowAuthForm(false);
@@ -352,7 +296,6 @@ export default function Home() {
         }
       }
 
-      // If checks pass, assign to the new group
       if (groupId) {
         const status = await assignUserToGroup(loggedInUser, groupId, answers);
         if (status === 'full') {
@@ -372,30 +315,16 @@ export default function Home() {
 
     } catch (err: any) {
       console.error("Google join error:", err);
-      setAuthError("Failed to sign in with Google. Please try again.");
+      setAuthError("Failed to sign in with Google.");
     }
   };
-  
-  // --- 6. Handle login *before* answering ---
-  const handleLogin = async () => {
-    if (!email || !password) {
-      setAuthError('Please enter email and password.');
-      return;
-    }
-    setAuthError(null);
+
+  const handleSignOut = async () => {
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      setEmail('');
-      setPassword('');
-    } catch (err: any) {
-      console.error("Login error:", err);
-      if (err.code === 'auth/invalid-credential') {
-        setAuthError('Invalid email or password. Please try again.');
-      } else if (err.code === 'auth/invalid-email') {
-        setAuthError('Please enter a valid email address.');
-      } else {
-        setAuthError('An error occurred. Please try again.');
-      }
+      await signOut(auth);
+    } catch (err) {
+      console.error('Failed to sign out:', err);
+      setError('Failed to sign out.');
     }
   };
 
@@ -405,15 +334,12 @@ export default function Home() {
     }
   };
 
-  // --- 7. Add user to group AND save to user doc ---
   const assignUserToGroup = async (
     currentUser: User, 
     finalGroupId: string,
     rawAnswers: { [key: number]: string }
   ): Promise<'success' | 'full'> => {
     if (!currentUser || !finalGroupId) return 'success';
-    
-    console.log(`Attempting to assign user ${currentUser.uid} to group ${finalGroupId}`);
     const today = getTodayDate();
     const userRef = doc(db, 'users', currentUser.uid);
 
@@ -428,16 +354,12 @@ export default function Home() {
         }
 
         if (members.length >= 10 && !members.includes(currentUser.uid)) {
-          // --- GROUP IS FULL ---
-          console.log(`Group ${finalGroupId} is full. User ${currentUser.uid} denied.`);
-          // Mark the user as "blocked" for the day
           transaction.set(userRef, {
             groupFull: { date: today }
           }, { merge: true });
           return 'full';
         }
 
-        // --- GROUP HAS SPACE ---
         const answersAsArray = questions.map((_, index) => rawAnswers[index]);
         const dailyGroupData = {
           date: today,
@@ -445,39 +367,44 @@ export default function Home() {
           answers: answersAsArray
         };
 
-        // Write to group
         transaction.set(groupRef, {
           members: arrayUnion(currentUser.uid)
         }, { merge: true });
 
-        // Write to user (and remove any "full" flag)
         transaction.set(userRef, { 
           dailyGroup: dailyGroupData,
-          groupFull: deleteField() // Clear any "full" flag
+          groupFull: deleteField()
         }, { merge: true });
         
         return 'success';
       });
 
-      return status; // 'success' or 'full'
+      return status;
       
     } catch (err) {
       console.error('Failed to assign group with transaction:', err);
-      setError('There was an error joining your group. Please try again.');
-      return 'success'; // Fail open
+      setError('Error joining group. Please try again.');
+      return 'success';
     }
   };
 
-  // --- MODIFIED RENDER ---
-  // We now have one main <main> return, and all other
-  // UI states are rendered conditionally *inside* it.
+  // --- LOADING STATE (RENDER THIS IF FETCHING) ---
+  if (isCheckingUser || isFetchingQuestions) {
+    return (
+      <main className="loading-container">
+        {/* This will appear inside the fadeInPage animation */}
+        <p>Loading today's questions...</p>
+      </main>
+    );
+  }
+
   return (
     <main>
       <Head>
         <title>Brillianse - Daily Questions</title>
       </Head>
 
-      {/* --- Sign In Button in Header --- */}
+      {/* Sign In Button */}
       {!user && !showAuthForm && (
         <div className="header-actions">
           <button className="btn-sign-in-header" onClick={() => {
@@ -485,8 +412,8 @@ export default function Home() {
             setEmail('');
             setPassword('');
             setShowLoginModal(true);
-            setConfirmPassword(''); // <-- ADDED: Reset this field too
-            setAuthMode('login');   // <-- CHANGED: Set modal to 'login' mode
+            setConfirmPassword('');
+            setAuthMode('login');
             setShowAuthForm(true);
           }}>
             Sign In
@@ -494,12 +421,9 @@ export default function Home() {
         </div>
       )}
 
-      {/* --- Post-answer auth form --- */}
+      {/* Post-answer Auth Form */}
       {showAuthForm && (
         <div className="auth-container">
-          
-          {/* --- CONTENT NOW CHANGES BASED ON authMode --- */}
-
           {authMode === 'signup' ? (
             <>
               <h2>You're in Group {groupId}!</h2>
@@ -530,7 +454,6 @@ export default function Home() {
               <div className="auth-form">
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" />
                 <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" />
-                
                 <button onClick={handleGoogleJoin} className="btn-google">
                   Continue with Google
                 </button>
@@ -542,19 +465,16 @@ export default function Home() {
               </p>
             </>
           )}
-          {/* --- END OF DYNAMIC CONTENT --- */}
-
         </div>
       )}
 
-      {/* --- "GROUP FULL" MODAL --- */}
+      {/* Group Full Modal */}
       {showGroupFullModal && (
         <div className="sign-out-modal-overlay">
           <div className="sign-out-modal-content">
             <h2>Group Full</h2>
-            <p>This group already has 10 members. Please check back tomorrow for a new set of questions!</p>
+            <p>This group already has 10 members. Please check back tomorrow!</p>
             <div className="modal-actions">
-              {/* This button just logs them out. */}
               <button onClick={handleSignOut} className="btn-secondary">
                 Sign Out
               </button>
@@ -563,12 +483,25 @@ export default function Home() {
         </div>
       )}
 
-      {/* --- Main Question Form --- */}
-      {questions.length > 0 && !showAuthForm && (
+      {/* --- MAIN CONTENT LOGIC --- */}
+      
+      {/* 1. If we have an error (e.g. no questions) */}
+      {error && (
+        <div className="error-container">
+          <h2>No Questions Yet</h2>
+          <p>{error}</p>
+          {/* Optional: Add a button to manual refresh if needed */}
+          <button onClick={() => window.location.reload()} className="btn-secondary" style={{marginTop: '1rem'}}>
+            Refresh
+          </button>
+        </div>
+      )}
+
+      {/* 2. If we have questions, show the quiz */}
+      {questions.length > 0 && !showAuthForm && !error && (
         <div className="question-form">
-          
           <div className="progress-indicator">
-          <div className="progress-dots-container">
+            <div className="progress-dots-container">
               {questions.map((_, index) => (
                 <div
                   key={index}
@@ -583,7 +516,7 @@ export default function Home() {
           </div>
 
           <div className="question-block">
-          <div className="question-nav-header">
+            <div className="question-nav-header">
               {currentQuestionIndex > 0 && (
                 <button onClick={handleBack} className="btn-back-question">
                   <img 

@@ -1,0 +1,6 @@
+{
+  "/answers/page": "app/answers/page.js",
+  "/group/[groupId]/page": "app/group/[groupId]/page.js",
+  "/page": "app/page.js",
+  "/profile/page": "app/profile/page.js"
+}

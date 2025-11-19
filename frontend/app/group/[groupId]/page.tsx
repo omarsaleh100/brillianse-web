@@ -12,12 +12,12 @@ function getTodayDate() {
   return new Date().toISOString().split('T')[0];
 }
 
-// --- MODIFIED: Add profilePictureUrl ---
 type UserProfile = {
   id: string;
-  username: string;
+  name: string;     // <-- NEW: Real Name
+  username: string; // <-- Existing: Handle
   email: string;
-  profilePictureUrl?: string; // <-- NEW
+  profilePictureUrl?: string;
   socials: {
     twitter?: string;
     linkedin?: string;
@@ -32,9 +32,14 @@ export default function GroupPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [members, setMembers] = useState<UserProfile[]>([]);
-  const [showSignOutModal, setShowSignOutModal] = useState(false);
+  
   const [selectedMember, setSelectedMember] = useState<UserProfile | null>(null);
   
+  const [showAnswersModal, setShowAnswersModal] = useState(false);
+  const [myAnswers, setMyAnswers] = useState<string[]>([]);
+  const [questions, setQuestions] = useState<string[]>([]);
+  const [answersLoading, setAnswersLoading] = useState(false);
+
   const router = useRouter();
   const params = useParams();
   const groupId = params.groupId as string;
@@ -64,28 +69,35 @@ export default function GroupPage() {
         }
 
         const memberIds: string[] = groupSnap.data().members || [];
+        
+        if (!memberIds.includes(user.uid)) {
+           router.push('/');
+           return;
+        }
+
         const profilePromises = memberIds.map(id => 
           getDoc(doc(db, 'users', id))
         );
         const profileDocs = await Promise.all(profilePromises);
 
-        // --- MODIFIED: Get the profilePictureUrl ---
         const memberProfiles = profileDocs
           .filter(docSnap => docSnap.exists())
           .map(docSnap => {
             const data = docSnap.data() as DocumentData;
             return {
               id: docSnap.id,
-              username: data.username || 'Anonymous User',
+              // Fallback to username if name is missing (for old accounts)
+              name: data.name || data.username || 'Anonymous', 
+              username: data.username || 'user',
               email: data.email,
-              profilePictureUrl: data.profilePictureUrl || null, // <-- NEW
+              profilePictureUrl: data.profilePictureUrl || null,
               socials: data.socials || {},
             };
           });
           const sortedMembers = memberProfiles.sort((a, b) => {
-            if (a.id === user.uid) return -1; // 'a' (current user) comes first
-            if (b.id === user.uid) return 1;  // 'b' (current user) comes first
-            return 0; // Otherwise, keep original order
+            if (a.id === user.uid) return -1; 
+            if (b.id === user.uid) return 1;
+            return 0; 
           });
   
           setMembers(sortedMembers);
@@ -97,19 +109,29 @@ export default function GroupPage() {
       }
     };
     fetchGroupData();
-  }, [groupId, user]);
+  }, [groupId, user, router]);
 
-  const handleSignOut = async () => {
-    setShowSignOutModal(true);
-  };
-
-  const confirmSignOut = async () => {
+  const handleViewAnswers = async () => {
+    setShowAnswersModal(true);
+    if (questions.length > 0 && myAnswers.length > 0) return;
+    if (!user) return;
     try {
-      await signOut(auth);
-      setShowSignOutModal(false); // Close modal on success
-      // Router will redirect via the onAuthStateChanged listener
+      setAnswersLoading(true);
+      const userRef = doc(db, 'users', user.uid);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        const data = userSnap.data();
+        setMyAnswers(data.dailyGroup?.answers || []);
+      }
+      const configRef = doc(db, 'config', 'daily');
+      const configSnap = await getDoc(configRef);
+      if (configSnap.exists()) {
+        setQuestions(configSnap.data().questions || []);
+      }
     } catch (err) {
-      console.error('Failed to sign out:', err);
+      console.error("Error loading answers:", err);
+    } finally {
+      setAnswersLoading(false);
     }
   };
 
@@ -127,17 +149,20 @@ export default function GroupPage() {
       </Head>
 
       <div className="header-actions">
-        <button onClick={handleSignOut} className="btn-sign-in-header">
-          Sign Out
-        </button>
+        <Link href="/profile" className="btn-sign-in-header">
+          Profile
+        </Link>
       </div>
 
       <div className="group-header">
         <h1>Your Group: <code>{groupId}</code></h1>
-        <p>Here are the {members.length} members who answered the same as you today.</p>
+        {members.length > 1 && (
+          <p>Here are the {members.length} members who answered the same as you today.</p>
+        )}
         <div className="header-links">
-          <Link href="/profile">Edit Your Profile</Link>
-          <Link href="/answers">View My Answers</Link>
+          <button onClick={handleViewAnswers} className="btn-link-style">
+            View My Answers
+          </button>
         </div>
       </div>
 
@@ -156,7 +181,7 @@ export default function GroupPage() {
               <img 
                 src={member.profilePictureUrl || DEFAULT_AVATAR_URL} 
                 alt="Profile"
-                className="member-avatar" // This class will be bigger
+                className="member-avatar"
                 onError={(e) => (e.currentTarget.src = DEFAULT_AVATAR_URL)}
               />
               {member.id === user?.uid && (
@@ -165,9 +190,11 @@ export default function GroupPage() {
             </div>
             
             <div className="member-info">
-              <h3>
-                {member.username}
-              </h3>
+              {/* --- NAME (White, Bold) --- */}
+              <h3>{member.name}</h3>
+              
+              {/* --- USERNAME (Gray, Small) --- */}
+              <p className="member-handle">@{member.username}</p>
               
               <div className="social-links">
                 {member.socials.twitter && (
@@ -177,7 +204,7 @@ export default function GroupPage() {
                   <a href={member.socials.linkedin.startsWith('http') ? member.socials.linkedin : `https://${member.socials.linkedin}`} target="_blank" rel="noopener noreferrer">LinkedIn</a>
                 )}
                 {member.socials.instagram && (
-                  <a href={member.socials.instagram.startsWith('http') ? member.socials.instagram : `https://${member.socials.instagram}`} target="_blank" rel="noopener noreferrer">Instagram</a>
+                  <a href={`https://instagram.com/${member.socials.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer">Instagram</a>
                 )}
                 {member.id !== user?.uid && (
                   <a href={`mailto:${member.email}`}>Email</a>
@@ -191,22 +218,7 @@ export default function GroupPage() {
           </div>
         ))}
       </div>
-      {showSignOutModal && (
-          <div className="sign-out-modal-overlay">
-          <div className="sign-out-modal-content">
-            <h2>Are you sure?</h2>
-            <p>This will sign you out of your account and return you to the daily questions.</p>
-            <div className="modal-actions">
-              <button onClick={confirmSignOut} className="btn-danger">
-                Sign Out
-              </button>
-              <button onClick={() => setShowSignOutModal(false)} className="btn-secondary">
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      
       {selectedMember && (
         <div className="member-modal-overlay" onClick={() => setSelectedMember(null)}>
           <div className="member-modal-content" onClick={(e) => e.stopPropagation()}>
@@ -217,10 +229,13 @@ export default function GroupPage() {
                 onError={(e) => (e.currentTarget.src = DEFAULT_AVATAR_URL)}
               />
             </div>
-            
             <div className="member-modal-info">
-              <h2>{selectedMember.username}</h2>
+              {/* --- NAME (White, Bold) --- */}
+              <h2>{selectedMember.name}</h2>
               
+              {/* --- USERNAME (Gray, Small) --- */}
+              <p className="modal-handle">@{selectedMember.username}</p>
+
               {selectedMember.id === user?.uid && (
                 <span className="you-tag-modal">You</span>
               )}
@@ -244,11 +259,39 @@ export default function GroupPage() {
                 <p className="no-socials">This user hasn't added their socials yet.</p>
               )}
             </div>
-            
           </div>
           <p className="modal-exit-text">Press anywhere to exit enlarged view</p>
         </div>
       )}
+
+      {showAnswersModal && (
+        <div className="member-modal-overlay" onClick={() => setShowAnswersModal(false)}>
+          <div className="answers-modal-content" onClick={(e) => e.stopPropagation()}>
+            <h1>Your Answers</h1>
+            <p>These are the answers you submitted today.</p>
+
+            {answersLoading ? (
+              <p>Loading...</p>
+            ) : (
+              <div className="answers-list">
+                {questions.map((question, index) => (
+                  <div 
+                    key={index} 
+                    className={`answer-item ${myAnswers[index] === 'yes' ? 'answered-yes' : 'answered-no'}`}
+                  >
+                    <p className="question-text">{index + 1}. {question}</p>
+                    <span className={`answer-tag ${myAnswers[index] === 'yes' ? 'yes' : 'no'}`}>
+                      {myAnswers[index] || 'No Answer'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <p className="modal-exit-text">Press anywhere to close</p>
+        </div>
+      )}
+
     </main>
   );
 }

@@ -20,13 +20,11 @@
 }
 
 html {
-
-  overscroll-behavior-y: none; /* Disables the "bounce" effect */
+  background-color: #000000; 
 }
 
 html,
 body {
-  height: 100%;
   margin: 0;
   padding: 0;
 }
@@ -34,15 +32,33 @@ body {
 body {
   font-family: 'Inter', sans-serif;
   color: var(--c-text-light);
+  
+  /* Position relative ensures content stacks on top of the ::before background */
+  position: relative;
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  
+  /* STRETCH FIX: Oversize the background slightly to cover notches/bounces */
+  top: -10vh;
+  left: 0;
+  width: 100vw;
+  height: 120vh; /* 120% height ensures it covers address bar movements */
+  
+  z-index: -1;
+  
   background-image: radial-gradient(ellipse at top center, 
     var(--c-dark-purple) 0%, 
     #1a0e1c 60%, 
     #000000 100%);
   background-repeat: no-repeat;
-  background-attachment: fixed;
-  overflow-x: hidden;
   background-size: 200% 200%;
   animation: moveGradient 15s ease infinite;
+  will-change: transform, opacity;
 }
 
 main {
@@ -187,10 +203,14 @@ body.app-loading .global-header {
   cursor: pointer;
   font-weight: 500;
   font-size: 0.9rem;
+  text-decoration: none;
+  display: inline-block;
 }
 .btn-sign-in-header:hover {
   background: var(--c-card-bg-light);
+  text-decoration: none;
 }
+
 
 .auth-container,
 .login-modal-content {
@@ -297,51 +317,15 @@ body.app-loading .global-header {
   background: #f0f0f0;
 }
 
-/* --- ADD THESE NEW ANIMATION RULES --- */
-
-/* The keyframes for the spinning logo */
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+@keyframes fadeInPage {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
-/* This is the full-screen overlay for the loading state */
-.app-loading-overlay {
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background-color: var(--c-dark-purple); /* Matches the app background */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-  transition: opacity 0.5s ease-out; /* Fades out */
-}
-
-/* This applies the spin animation to the logo *inside* the overlay */
-.app-loading-overlay .loading-logo {
-  animation: spin 1s linear;
-}
-
-/* This is the wrapper for your actual app content */
 .app-content-wrapper {
-  transition: opacity 0.5s ease-in 0.3s; /* Fades in, with a delay */
+  opacity: 0; 
+  animation: fadeInPage 0.5s ease-out forwards;
 }
-
-/* Utility classes to control the fading */
-.visible {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.hidden {
-  opacity: 0;
-  pointer-events: none;
-}
-/* --- END OF NEW RULES --- */
 
 .login-modal-overlay {
   position: fixed;
@@ -493,10 +477,32 @@ body.app-loading .global-header {
   border: 2px solid var(--c-yes);
 }
 
-.btn-answer:first-of-type:not(.selected):hover {
-  background-color: var(--c-yes); /* <-- ADDED */
-  color: black; /* <-- ADDED */
-  transform: scale(1.15); /* <-- ADDED */
+@media (hover: hover) {
+  .btn-answer:first-of-type:not(.selected):hover {
+    background-color: var(--c-yes);
+    color: black;
+    transform: scale(1.15);
+  }
+  
+  .btn-answer:last-of-type:not(.selected):hover {
+    background-color: var(--c-no);
+    color: black;
+    transform: scale(1.15);
+  }
+}
+
+.btn-answer:first-of-type:active {
+  background-color: var(--c-yes);
+  color: black;
+  transform: scale(1.15);
+  transition: transform 0.05s ease; /* Instant response */
+}
+
+.btn-answer:last-of-type:active {
+  background-color: var(--c-no);
+  color: black;
+  transform: scale(1.15);
+  transition: transform 0.05s ease; /* Instant response */
 }
 
 .btn-answer:first-of-type.selected {
@@ -506,13 +512,6 @@ body.app-loading .global-header {
 .btn-answer:last-of-type {
   border: 2px solid var(--c-no);
 }
-
-.btn-answer:last-of-type:not(.selected):hover {
-  background-color: var(--c-no); /* <-- ADDED */
-  color: black; /* <-- ADDED */
-  transform: scale(1.15); /* <-- ADDED */
-}
-
 .btn-answer:last-of-type.selected {
   background: var(--c-no);
   color: var(--c-text-dark);
@@ -759,7 +758,7 @@ body.app-loading .global-header {
   width: 100%;
   max-width: 500px;
   text-align: center;
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
 }
 
 .group-empty-message {
@@ -768,7 +767,7 @@ body.app-loading .global-header {
   font-style: italic;
   text-align: center;
   max-width: 400px;
-  margin: 2rem 0;
+  margin: 0.25rem 0 2rem 0;
 }
 
 .group-header h1 code {
@@ -864,15 +863,57 @@ body.app-loading .global-header {
   gap: 2rem;
 }
 
+/* --- USER HANDLES (The @username part) --- */
+
+/* List Card View */
+.member-handle {
+  color: var(--c-text-faded);
+  font-size: 0.9rem;
+  font-weight: 400;
+  margin-top: -0.25rem; /* Pull closer to the Name above */
+  margin-bottom: 0.75rem;
+}
+
+/* Modal View */
+.modal-handle {
+  color: var(--c-text-faded);
+  font-size: 1.1rem;
+  font-weight: 400;
+  margin-top: -0.5rem;
+  margin-bottom: 1rem;
+}
+
+/* --- RESPONSIVE ADJUSTMENTS --- */
+@media (max-width: 700px) {
+  /* Card View on Mobile */
+  .member-handle {
+    font-size: 0.8rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  /* Modal View on Mobile */
+  .modal-handle {
+    font-size: 1rem;
+    margin-bottom: 0.75rem;
+  }
+  
+  /* Adjust Name margin to play nice with handle */
+  .member-modal-info h2 {
+    margin-bottom: 0.2rem;
+  }
+}
+
 .modal-exit-text {
   position: absolute;
-  bottom: 3rem; /* Position it near the bottom of the screen */
+  bottom: 3rem;
   left: 50%;
   transform: translateX(-50%);
-  color: var(--c-text-faded); /* Small gray text */
+  width: 100%;
+  text-align: center;
+  color: var(--c-text-faded);
   font-size: 0.7rem;
   font-weight: 500;
-  pointer-events: none; /* Prevents text from blocking the overlay click */
+  pointer-events: none;
 }
 
 .member-modal-image {
@@ -990,13 +1031,17 @@ body.app-loading .global-header {
 
 /* --- ANSWERS PAGE --- */
 .answers-container {
-  width: 100%;
-  max-width: 500px;
-  background: var(--c-card-bg);
-  padding: 1.5rem 2rem;
+  background-color: var(--c-card-bg);
+  border: 1px solid var(--c-card-border);
   border-radius: 20px;
-  border: 1px solid var(--c-card-bg-light);
-  flex-shrink: 0;
+  padding: 2rem;
+  width: 100%;
+  max-width: 500px; /* Keep the form's max-width */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  flex-shrink: 0; /* Prevents form from squishing */
 }
 .answers-list {
   margin-top: 1rem;
@@ -1133,4 +1178,287 @@ body.app-loading .global-header {
 
 body.no-scroll {
   overflow: hidden;
+}
+
+html.intro-skipped .app-loading-overlay {
+  display: none !important;
+}
+
+html.intro-skipped .app-content-wrapper {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+@media (max-width: 1024px) {
+  .profile-content-wrapper {
+    flex-direction: column; /* Stack items vertically */
+    align-items:center;    /* Center them horizontally */
+    gap: 1rem;              /* Reduce gap */
+  }
+
+  .profile-nav-wrapper {
+    flex: 0 0 auto;       /* Stop it from stretching */
+    width: 100%;          /* Take full width of the container */
+    max-width: 500px;     /* Match the form's width */
+    justify-content: flex-start; /* Align button to the left edge of the form */
+  }
+
+  /* Hide the empty spacer on mobile so it doesn't add extra space at the bottom */
+  .profile-nav-wrapper:last-child {
+    display: none;
+  }
+}
+
+/* --- GENERAL MOBILE ADJUSTMENTS --- */
+@media (max-width: 700px) {
+  /* Shrink the main container slightly on phones so content isn't edge-to-edge */
+  main {
+    width: 92%;      /* "Just a lil smaller" than 100% */
+    height: 60%;
+    margin: 0 auto;  /* Keeps it perfectly centered */
+    padding-left: 0; /* Remove default padding if we are controlling width */
+    padding-right: 0;
+  }
+}
+
+/* --- RESPONSIVE MODAL FOR MOBILE (TIGHT LAYOUT) --- */
+@media (max-width: 700px) {
+  .member-modal-content {
+    flex-direction: row;      /* Keep side-by-side */
+    align-items: center;      /* Vertically center items */
+    justify-content: center;  /* Horizontally center the whole cluster */
+    padding: 1.5rem 0.5rem;   /* Minimal side padding */
+    gap: 1rem;                /* Fixed gap between image and text */
+    width: 95%;
+    max-height: 80vh;
+  }
+
+  .member-modal-image img {
+    width: 175px;              /* Slightly smaller to fit tight spaces */
+    height: 175px;
+    border-width: 2px;
+  }
+
+  .member-modal-info {
+    text-align: center;         /* Force text to align left (next to image) */
+    flex-grow: 0;             /* STOP it from stretching */
+    width: auto;              /* Only take necessary width */
+    min-width: 0;             /* Prevents flex items from overflowing */
+  }
+
+  .member-modal-info h2 {
+    font-size: 1.5rem;
+    margin-bottom: 0.25rem;
+    word-break: break-word;   /* Prevent long names from breaking layout */
+  }
+
+  .you-tag-modal {
+    margin-bottom: 0.5rem;
+    font-size: 0.75rem;
+    padding: 0.15rem 0.5rem;
+  }
+  
+  .social-links-modal {
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* Align buttons to the left */
+    gap: 0.5rem;
+    width: 100%;
+  }
+  
+  .social-links-modal a {
+    width: auto;             /* Buttons hug their text */
+    font-size: 0.85rem;
+    padding: 0.4rem 0.8rem;
+    text-align: left;
+    white-space: nowrap;     /* Prevent button text wrapping awkwardly */
+  }
+
+  .modal-exit-text {
+    bottom: 3rem;
+  }
+}
+
+/* --- RESPONSIVE GROUP GRID FOR MOBILE (2 Columns) --- */
+@media (max-width: 700px) {
+  .member-list {
+    gap: 0.75rem;
+    justify-content: center;
+  }
+
+  .member-circle-card {
+    width: calc(50% - 0.5rem);
+    min-width: 0;
+  }
+
+  .member-avatar {
+    width: 100px;  
+    height: 100px;
+    border-width: 2px;
+  }
+  
+  .member-info h3 {
+    font-size: 1rem;
+    margin-bottom: 0.25rem;
+    word-break: break-word;
+  }
+  
+  .you-tag-circle {
+    font-size: 0.7rem;
+    padding: 0.1rem 0.4rem;
+    bottom: -5px;
+  }
+  
+  .social-links {
+    gap: 0.5rem;
+  }
+  
+  .social-links a {
+    font-size: 0.75rem;
+  }
+  /* --- COMPACT LOGIN / AUTH VIEW FOR MOBILE --- */
+  .auth-container,
+  .login-modal-content {
+    padding: 1.5rem 1rem;   /* Reduce padding */
+    width: 95%;             /* Use almost full width */
+    max-width: 400px;       /* Cap the width */
+    
+    /* SAFETY FIX: If it's still too tall, let it scroll instead of crop */
+    max-height: 90vh;       
+    overflow-y: auto;
+  }
+
+  .auth-container h2,
+  .login-modal-content h2 {
+    font-size: 1.5rem;      /* Smaller title */
+    margin-bottom: 0.25rem;
+  }
+
+  .auth-container p {
+    font-size: 0.9rem;      /* Smaller description */
+    margin-bottom: 1rem;
+  }
+
+  .auth-form {
+    gap: 0.75rem;           /* Reduce gap between inputs */
+    margin-top: 1rem;
+  }
+
+  .auth-form input {
+    padding: 0.75rem;       /* Smaller inputs (was 1rem) */
+    font-size: 0.95rem;
+  }
+
+  .btn-google,
+  .btn-primary {
+    padding: 0.75rem;       /* Smaller buttons (was 1rem) */
+    font-size: 0.95rem;
+  }
+  
+  .auth-toggle-link {
+    margin-top: 1rem;
+    font-size: 0.85rem;
+  }
+}
+/* --- BUTTON THAT LOOKS LIKE A LINK --- */
+.btn-link-style {
+  background: var(--c-card-bg);
+  color: var(--c-text-light);
+  border: 1px solid var(--c-card-bg-light);
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+}
+.btn-link-style:hover {
+  background: var(--c-card-bg-light);
+  text-decoration: none;
+}
+
+/* --- ANSWERS MODAL CONTENT --- */
+.answers-modal-content {
+  width: 100%;
+  max-width: 500px;
+  background: var(--c-card-bg);
+  border: 1px solid var(--c-card-bg-light);
+  padding: 1.5rem 2rem;
+  border-radius: 20px;
+  text-align: center;
+  
+  /* Handle overflow if answers list is long on mobile */
+  max-height: 85vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.answers-modal-content h1 {
+  font-size: 1.5rem;
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+}
+
+.answers-modal-content p {
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+}
+
+/* --- RESPONSIVE TWEAK FOR ANSWERS MODAL --- */
+@media (max-width: 700px) {
+  .answers-modal-content {
+    width: 95%;
+    padding: 1.5rem 1rem;
+  }
+}
+@media (max-width: 700px) {
+  .answers-modal-content {
+    width: 85%;           /* Reduced width (was 95%) */
+    max-width: 350px;     /* Cap the width so it doesn't get too wide on larger phones */
+    padding: 1.25rem 1rem; /* Slightly less padding */
+   
+  }
+  
+  /* Optional: Scale down the text slightly inside the modal */
+  .answers-modal-content h1 {
+    font-size: 1.25rem;
+  }
+  .answers-modal-content p {
+    font-size: 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  /* Make the individual answer items more compact */
+  .answer-item {
+    padding: 0.7rem;
+  }
+  .answer-item .question-text {
+    font-size: 0.7rem;
+  }
+  .answer-tag {
+    font-size: 0.85rem;
+    padding: 0.2rem 0.5rem;
+    width: 50px;
+  }
+  .sign-out-modal-content {
+    width: 85%;           /* Match other modals */
+    max-width: 400px;     /* Keep it compact */
+    padding: 1.5rem 1rem; /* Reduce padding */
+    
+    /* Ensure it fits vertically if screen is small/landscape */
+    max-height: 80vh;     
+    overflow-y: auto;
+  }
+  
+  /* Optional: adjust text size for mobile */
+  .sign-out-modal-content h2 {
+    font-size: 1.4rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .sign-out-modal-content p {
+    font-size: 0.8rem;
+    margin-bottom: 1rem;
+  }
 }
