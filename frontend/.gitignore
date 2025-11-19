@@ -55,9 +55,5 @@ out/
 build/
 dist/
 
-# Node packages (already there, but ensure it's present)
 node_modules/
 
-# Local Environment Variables (Keep your secrets safe!)
-.env
-.env*.local
