@@ -41,3 +41,23 @@ yarn-error.log*
 next-env.d.ts
 
 .env.local
+
+/.firebase
+
+# Firebase cache and emulators
+.firebase/
+firebase-debug.log*
+firebase-debug.*.log
+
+# Next.js build output (Frontend)
+.next/
+out/
+build/
+dist/
+
+# Node packages (already there, but ensure it's present)
+node_modules/
+
+# Local Environment Variables (Keep your secrets safe!)
+.env
+.env*.local
