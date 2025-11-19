@@ -17,6 +17,16 @@
 }
 
 html {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  background-color: #000;
+}
+
+html::-webkit-scrollbar {
+  display: none;
+}
+
+html {
   background-color: #000;
 }
 

@@ -14,9 +14,18 @@
   --c-text-faded: #A0A0A0;
 }
 
-/* --- BASE STYLES --- */
 * {
   box-sizing: border-box;
+}
+
+html {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+  background-color: #000000;
+}
+
+html::-webkit-scrollbar {
+  display: none;
 }
 
 html {

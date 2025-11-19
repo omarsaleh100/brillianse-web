@@ -58,20 +58,31 @@ export default function Home() {
   };
 
   // --- 1. Listen for user auth changes ---
+  // --- 1. Listen for user auth changes ---
   useEffect(() => {
-    // If the auth form is showing, allow scrolling (remove the class)
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      
+      // If no user is found, we are done checking. 
+      // If a user IS found, the "Check if user has already played" effect will handle the loading state.
+      if (!currentUser) {
+        setIsCheckingUser(false);
+      }
+    });
+
+    // Cleanup subscription on unmount
+    return () => unsubscribe();
+  }, []);
+
+  // --- 1.5 Handle Body Scroll (Separate Effect) ---
+  useEffect(() => {
     if (showAuthForm) {
       document.body.classList.remove('no-scroll');
     } else {
-      // Otherwise (during questions), lock scrolling
       document.body.classList.add('no-scroll');
     }
-
-    // Cleanup: always remove the class when unmounting or changing state
-    return () => {
-      document.body.classList.remove('no-scroll');
-    };
-  }, [showAuthForm]); // <-- Dependency added here
+    return () => document.body.classList.remove('no-scroll');
+  }, [showAuthForm]);
 
   // --- 2. Check if user has already played ---
   useEffect(() => {
